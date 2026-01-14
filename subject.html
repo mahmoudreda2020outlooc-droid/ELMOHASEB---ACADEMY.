@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المادة الدراسية - منصة المعادلة</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Load Appwrite SDK and Config -->
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <script src="js/appwrite-config.js"></script>
+    <script src="js/db-appwrite.js"></script>
+
+    <script>
+        // --- Security Checks ---
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        // VISUAL DEBUGGER (Console Only Now)
+        function debugStatus(msg, color = 'black') {
+            // Visual box removed for production UI
+            console.log(msg);
+        }
+
+        document.addEventListener('keydown', async (e) => {
+            // Block DevTools
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || (e.ctrlKey && e.key === 'U')) {
+                e.preventDefault();
+                return false;
+            }
+
+            // Detect PrintScreen
+            if (e.key === 'PrintScreen') {
+                debugStatus("📸 Key 'PrintScreen' Detected!", "blue");
+
+                // 1. Clear Clipboard
+                try { navigator.clipboard.writeText(""); } catch (err) { }
+
+                // 2. Report Incident
+                try {
+                    debugStatus("Attempting DB Log...", "orange");
+                    const username = localStorage.getItem('user_display_name') || 'Unknown Student';
+
+                    if (window.dbLogAdd) {
+                        await window.dbLogAdd({
+                            id: Date.now(),
+                            username: username,
+                            type: 'محاولة تصوير شاشة (PrintScreen)',
+                            timestamp: Date.now()
+                        });
+                        debugStatus("✅ Log Saved to DB Successfully!", "green");
+                    } else {
+                        throw new Error("DB function missing (window.dbLogAdd is undefined)");
+                    }
+                } catch (dbErr) {
+                    debugStatus("❌ Save Failed: " + dbErr.message, "red");
+                }
+
+                // 3. Show Warning (Non-blocking for now)
+                document.body.style.display = 'none';
+                setTimeout(() => {
+                    document.body.style.display = 'block';
+                    // alert("تم رصد محاولة تصوير! (Debug Mode)");
+                }, 500);
+            }
+        });
+
+        // 3. Focus Loss Listener (Detects Snipping Tool / Alt-Tab)
+        window.addEventListener('blur', async () => {
+            // Avoid logging if user is just interacting with the page (e.g. clicking iframe)
+            // But for high security, we log any focus loss.
+            debugStatus("Window lost focus (Snipping Tool/Alt-Tab ?)", "orange");
+
+            try {
+                if (window.dbLogAdd) {
+                    await window.dbLogAdd({
+                        id: Date.now(),
+                        username: localStorage.getItem('user_display_name') || 'Unknown',
+                        type: 'خروج من النافذة (فقدان تركيز)',
+                        timestamp: Date.now()
+                    });
+                    debugStatus("⚠️ Violation Logged: Focus Lost", "red");
+                }
+            } catch (e) { console.error(e); }
+
+            // Hide screen content to prevent background recording
+            document.body.style.display = 'none';
+            setTimeout(() => document.body.style.display = 'block', 1000);
+        });
+
+        // Ensure DB loads
+        window.onload = async () => {
+            try {
+                await window.dbInit();
+                debugStatus("System Ready (DB V" + DB_VERSION + ")", "green");
+            } catch (e) {
+                debugStatus("DB Init Failed: " + e.message, "red");
+            }
+        };
+
+        // DEBUG: Catch all errors
+        window.onerror = function (msg, url, line) {
+            debugStatus("Global Error: " + msg, "red");
+        };
+
+        // Mocking Firebase Auth for UI flow - Handled by db-firebase.js
+        // const app = initializeApp(firebaseConfig); // Unused for now
+        // const auth = getAuth(app); // Unused for now
+
+        function getQueryParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        const subjects = {
+            'math': { name: 'الرياضيات', icon: '📐' },
+            'geo': { name: 'الجغرافيا', icon: '🌍' },
+            'eng': { name: 'اللغة الإنجليزية', icon: '🇬🇧' },
+            'fr': { name: 'اللغة الفرنسية', icon: '🇫🇷' }
+        };
+
+        async function renderDynamicMaterials(subjectId) {
+            try {
+                // Ensure helper is loaded
+                if (!window.dbGetAll) {
+                    alert("❌ خطأ: لم يتم تحميل ملف قاعدة البيانات (js/db-local.js)!");
+                    return;
+                }
+
+                const materials = await window.dbGetAll();
+                const subjectMaterials = materials.filter(m => m.subjectId === subjectId);
+
+                ['videos', 'pdfs', 'sheets', 'exams'].forEach(sectionId => {
+                    const container = document.getElementById(sectionId);
+                    const items = subjectMaterials.filter(m => m.sectionId === sectionId);
+
+                    if (items.length > 0) {
+                        container.innerHTML = '';
+
+                        items.forEach(item => {
+                            let icon = '📄';
+                            let btnLabel = 'عرض الملف';
+                            let isVideo = sectionId === 'videos';
+
+                            if (isVideo) {
+                                icon = '▶️';
+                                btnLabel = 'مشاهدة';
+                            }
+
+                            // Create Elements
+                            const div = document.createElement('div');
+                            div.className = 'material-item';
+
+                            const infoDiv = document.createElement('div');
+                            infoDiv.className = 'material-info';
+
+                            const iconDiv = document.createElement('div');
+                            iconDiv.className = 'material-icon';
+                            iconDiv.textContent = icon;
+
+                            const textDiv = document.createElement('div');
+                            const h3 = document.createElement('h3');
+                            h3.textContent = item.title;
+                            const p = document.createElement('p');
+                            p.style.color = '#666';
+                            p.style.fontSize = '0.9rem';
+                            p.textContent = item.desc || '';
+
+                            textDiv.appendChild(h3);
+                            textDiv.appendChild(p);
+                            infoDiv.appendChild(iconDiv);
+                            infoDiv.appendChild(textDiv);
+
+                            const btn = document.createElement('button');
+                            btn.className = 'action-btn';
+                            btn.textContent = btnLabel;
+
+                            // Attach Event Listener Securely
+                            btn.addEventListener('click', () => {
+                                // Debug Alert
+                                // alert("جاري فتح الملف..."); 
+
+                                try {
+                                    let effectiveUrl = item.url;
+
+                                    // Handle Blob
+                                    if (item.isBlob || (item.url && typeof item.url === 'object')) {
+                                        try {
+                                            effectiveUrl = URL.createObjectURL(item.url);
+                                        } catch (blobErr) {
+                                            alert("فشل في معالجة الملف (Blob): " + blobErr.message);
+                                            return;
+                                        }
+                                    }
+
+                                    if (isVideo) {
+                                        if (!window.openSecureVideo) { alert("خطأ: دالة الفيديو غير موجودة!"); return; }
+                                        window.openSecureVideo(effectiveUrl);
+                                    } else {
+                                        if (!window.openSecurePDF) { alert("خطأ: دالة PDF غير موجودة!"); return; }
+                                        window.openSecurePDF(effectiveUrl);
+                                    }
+                                } catch (clickErr) {
+                                    alert("خطأ أثناء النقر: " + clickErr.message);
+                                }
+                            });
+
+                            div.appendChild(infoDiv);
+                            div.appendChild(btn);
+                            container.appendChild(div);
+                        });
+                    } else {
+                        container.innerHTML = `<p style="text-align:center; color:#777; margin-top:2rem;">لا يوجد محتوى في هذا القسم حالياً.</p>`;
+                    }
+                });
+            } catch (err) {
+                alert("فشل تحميل المحتوى: " + err.message);
+                console.error(err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Check Login
+            const userEmail = localStorage.getItem('user_email');
+            const displayName = localStorage.getItem('user_display_name');
+
+            if (!userEmail) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // 2. Set Welcome Message
+            document.getElementById('welcomeMsg').textContent = `مرحبا، ${displayName || 'طالب'}`;
+
+            // 3. Load Avatar & Setup Upload
+            try {
+                // We need to fetch the full user object to get the avatar
+                // Since we don't have ID directly, we search by username (stored in displayName usually)
+                // Note: user_display_name is set from user.username in index.html
+                await window.dbInit(); // Ensure DB is ready
+                const users = await window.dbUserGetAll();
+                const currentUser = users.find(u => u.username === displayName);
+
+                if (currentUser) {
+                    const defaultAvatar =
+                        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiIHdpZHRoPSIyNHB4IiBoZWlnaHQ9IjI0cHgiPjxwYXRoIGQ9Ik0xMiAxMkMxNC4yMSAxMiAxNiAxMC4yMSAxNiA4QzE2IDUuNzkgMTQuMjEgNCAxMiA0QzkuNzkgNCA4IDUuNzkgOCA4QzggMTAuMjEgOS43OSAxMiAxMiAxMlpNMTIgMTRDOS4zMyAxNCA0IDE1LjMzIDQgMThWMjBIMjBWMThDMjAgMTUuMzMgMTQuNjcgMTQgMTIgMTRaIi8+PC9zdmc+";
+                    const deleteBtn = document.getElementById('deleteAvatarBtn');
+
+                    const updateAvatarUI = (src) => {
+                        const avatarEl = document.getElementById('userAvatar');
+                        if (avatarEl) avatarEl.src = src;
+                        if (src !== defaultAvatar && deleteBtn) {
+                            deleteBtn.style.display = 'flex';
+                        } else if (deleteBtn) {
+                            deleteBtn.style.display = 'none';
+                        }
+                    };
+
+                    if (currentUser.avatar) {
+                        updateAvatarUI(currentUser.avatar);
+                    }
+
+                    window.deleteUserAvatar = async (e) => {
+                        e.stopPropagation();
+                        if (confirm("هل تريد حذف الصورة الشخصية؟")) {
+                            currentUser.avatar = null;
+                            await window.dbUserUpdate(currentUser);
+                            updateAvatarUI(defaultAvatar);
+                        }
+                    };
+
+                    // Handle File Upload
+                    const fileInput = document.getElementById('avatarUpload');
+                    fileInput.addEventListener('change', async (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            if (file.size > 2 * 1024 * 1024) { // 2MB Limit
+                                alert("الصورة كبيرة جداً! يرجى اختيار صورة أصغر من 2 ميجا.");
+                                return;
+                            }
+
+                            const reader = new FileReader();
+                            reader.onload = async function (evt) {
+                                const base64Image = evt.target.result;
+                                updateAvatarUI(base64Image);
+                                currentUser.avatar = base64Image;
+                                await window.dbUserUpdate(currentUser);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Avatar Load Error:", err);
+            }
+
+            // 4. Load Content (Existing Logic)
+            const subjectId = getQueryParam('id');
+            const subjectData = subjects[subjectId];
+
+
+            if (subjectData) {
+                document.getElementById('subjectTitle').textContent = subjectData.name;
+                document.getElementById('subjectIcon').textContent = subjectData.icon;
+                document.title = subjectData.name + ' - منصة المعادلة';
+                renderDynamicMaterials(subjectId);
+            } else {
+                document.body.innerHTML = '<h1 style="text-align:center; margin-top:50px;">مادة غير موجودة</h1>';
+            }
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                localStorage.removeItem('user_email');
+                window.location.href = 'index.html';
+            });
+
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.content-section').forEach(c => c.classList.remove('active'));
+                    tab.classList.add('active');
+                    const targetId = tab.dataset.target;
+                    document.getElementById(targetId).classList.add('active');
+                });
+            });
+        });
+    </script>
+    <style>
+        .header-section {
+            background: var(--primary-color);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+
+        .header-icon {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .tabs-container {
+            background: white;
+            padding: 0 1rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            max-width: 800px;
+            margin: 0 auto;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .tab:hover:not(.active) {
+            background: #f9f9f9;
+        }
+
+        .content-container {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .content-section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Material Card */
+        .material-item {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .material-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .material-icon {
+            width: 40px;
+            height: 40px;
+            background: #e3f2fd;
+            color: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .action-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-color);
+            color: #333;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .action-btn:hover {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+
+<body>
+    <nav style="background: #0a3a85; padding: 0.5rem 1rem; color: white; font-size: 0.9rem;">
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="dashboard.html" style="color: white; text-decoration: none; font-weight:bold;">&larr; الرئيسية</a>
+
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <!-- Hidden File Input for Avatar Upload -->
+                <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
+
+                <!-- Profile Section -->
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <div style="position: relative; cursor: pointer;" title="تغيير الصورة">
+                        <img id="userAvatar"
+                            src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiIHdpZHRoPSIyNHB4IiBoZWlnaHQ9IjI0cHgiPjxwYXRoIGQ9Ik0xMiAxMkMxNC4yMSAxMiAxNiAxMC4yMSAxNiA4QzE2IDUuNzkgMTQuMjEgNCAxMiA0QzkuNzkgNCA4IDUuNzkgOCA4QzggMTAuMjEgOS43OSAxMiAxMiAxMlpNMTIgMTRDOS4zMyAxNCA0IDE1LjMzIDQgMThWMjBIMjBWMThDMjAgMTUuMzMgMTQuNjcgMTQgMTIgMTRaIi8+PC9zdmc+"
+                            onclick="document.getElementById('avatarUpload').click()"
+                            style="width: 35px; height: 35px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); object-fit: cover;">
+
+                        <!-- Delete Button (Hidden by default) -->
+                        <div id="deleteAvatarBtn" title="حذف الصورة"
+                            style="display:none; position: absolute; bottom: -5px; right: -5px; background: red; color: white; border-radius: 50%; width: 15px; height: 15px; font-size: 10px; align-items: center; justify-content: center; z-index: 10;"
+                            onclick="window.deleteUserAvatar(event)">
+                            x
+                        </div>
+                    </div>
+                    <span id="welcomeMsg" style="font-weight: bold; cursor: pointer;"
+                        onclick="document.getElementById('avatarUpload').click()">مرحبا</span>
+                </div>
+
+                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.3);"></div>
+
+                <button id="logoutBtn"
+                    style="background:rgba(255,255,255,0.1); border:none; color:white; cursor:pointer; padding: 5px 10px; border-radius: 4px;">خروج
+                    🚪</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="header-section">
+        <div class="container">
+            <div id="subjectIcon" class="header-icon"></div>
+            <h1 id="subjectTitle">...</h1>
+        </div>
+    </div>
+
+    <div class="tabs-container">
+        <div class="tabs">
+            <div class="tab active" data-target="videos">🎥 المحاضرات</div>
+            <div class="tab" data-target="pdfs">📚 الملازم (PDF)</div>
+            <div class="tab" data-target="sheets">📝 الشيتات</div>
+            <div class="tab" data-target="exams">🏆 الامتحانات السابقة</div>
+        </div>
+    </div>
+
+    <div class="content-container">
+        <!-- Videos Section -->
+        <div id="videos" class="content-section active">
+            <div class="material-item">
+                <div class="material-info">
+                    <div class="material-icon">▶️</div>
+                    <div>
+                        <h3>المحاضرة الأولى: مقدمة</h3>
+                        <p style="color:#666; font-size:0.9rem;">مدة الشرح: 45 دقيقة</p>
+                    </div>
+                </div>
+                <button class="action-btn"
+                    onclick="openSecureVideo('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4')">مشاهدة</button>
+            </div>
+        </div>
+
+        <!-- PDF Section -->
+        <div id="pdfs" class="content-section">
+            <div class="material-item">
+                <div class="material-info">
+                    <div class="material-icon">📄</div>
+                    <div>
+                        <h3>ملزمة الشرح - الجزء الأول</h3>
+                        <p style="color:#666; font-size:0.9rem;">20 صفحة • للقراءة فقط</p>
+                    </div>
+                </div>
+                <!-- Using a sample PDF for demonstration -->
+                <button class="action-btn"
+                    onclick="openSecurePDF('https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf')">عرض
+                    الملف</button>
+            </div>
+        </div>
+
+        <!-- Sheets Section -->
+        <div id="sheets" class="content-section">
+            <p style="text-align:center; color:#777; margin-top:2rem;">لا توجد شيتات حالياً.</p>
+        </div>
+
+        <!-- Exams Section -->
+        <div id="exams" class="content-section">
+            <p style="text-align:center; color:#777; margin-top:2rem;">لا توجد امتحانات متاحة.</p>
+        </div>
+    </div>
+
+    <!-- Secure PDF Viewer Modal -->
+    <div id="pdfViewerModal" class="secure-modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>عارض الملفات الآمن</h3>
+                <div>
+                    <button class="icon-btn" onclick="toggleFullScreen('pdfViewerModal')"
+                        title="تكبير الشاشة">⛶</button>
+                    <button class="close-btn" onclick="closeModal('pdfViewerModal')" title="إغلاق">×</button>
+                </div>
+            </div>
+            <div class="modal-body"
+                style="position: relative; text-align: center; background: #525659; padding: 1rem; height: 80vh; overflow-y: auto;">
+                <div id="pdfContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Secure Video Player Modal -->
+    <div id="videoPlayerModal" class="secure-modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>مشغل الفيديو الآمن</h3>
+                <button class="close-btn" onclick="closeModal('videoPlayerModal')">×</button>
+            </div>
+            <div class="modal-body"
+                style="background: black; display: flex; justify-content: center; align-items: center;">
+                <video id="secureVideo" controls controlsList="nodownload"
+                    style="width: 100%; max-height: 80vh;"></video>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .secure-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 1000px;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 1rem;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .pdf-page-canvas {
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Dynamic Watermark */
+        .dynamic-watermark {
+            position: absolute;
+            pointer-events: none;
+            color: rgba(255, 0, 0, 0.3);
+            font-size: 1.5rem;
+            transform: rotate(-30deg);
+            z-index: 99;
+            user-select: none;
+        }
+
+        /* Icon Button */
+        .icon-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-left: 10px;
+            color: #555;
+        }
+
+        /* Fullscreen Fixes */
+        .modal-body.fullscreen {
+            height: 100vh !important;
+        }
+    </style>
+
+    <!-- PDF.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Ensure PDF.js Worker is set if lib is loaded
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        // Fullscreen Toggle
+        window.toggleFullScreen = function (modalId) {
+            const modal = document.getElementById(modalId);
+            if (!document.fullscreenElement) {
+                modal.requestFullscreen().catch(err => {
+                    alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        };
+
+        // Secure Viewer Logic - Attached to Window for Inline HTML Access
+        window.closeModal = function (id) {
+            document.getElementById(id).style.display = 'none';
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+            const video = document.getElementById('secureVideo');
+            if (video) video.pause();
+        };
+
+        window.openSecurePDF = async function (url) {
+            if (typeof pdfjsLib === 'undefined') {
+                alert('عذراً، مكتبة الـ PDF لم يتم تحميلها. تأكد من اتصالك بالإنترنت.');
+                return;
+            }
+
+            const modal = document.getElementById('pdfViewerModal');
+            const container = document.getElementById('pdfContainer');
+            const userEmail = localStorage.getItem('user_email') || 'User';
+
+            modal.style.display = 'flex';
+            container.innerHTML = '<p style="color:white">جاري التحميل...</p>';
+
+            try {
+                const loadingTask = pdfjsLib.getDocument(url);
+                const pdf = await loadingTask.promise;
+
+                container.innerHTML = ''; // Clear loading
+
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    const page = await pdf.getPage(pageNum);
+                    const scale = 1.5;
+                    const viewport = page.getViewport({ scale });
+
+                    // Wrapper
+                    const wrapper = document.createElement('div');
+                    wrapper.style.position = 'relative';
+                    wrapper.style.display = 'inline-block';
+                    wrapper.style.margin = '10px';
+
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    canvas.className = 'pdf-page-canvas';
+
+                    // Disable Right Click
+                    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+                    const renderContext = {
+                        canvasContext: context,
+                        viewport: viewport
+                    };
+                    await page.render(renderContext).promise;
+
+                    // Watermark
+                    function addWatermark(top, left) {
+                        const wm = document.createElement('div');
+                        wm.className = 'dynamic-watermark';
+                        wm.textContent = userEmail + ' - ' + new Date().toLocaleDateString();
+                        wm.style.top = top + '%';
+                        wm.style.left = left + '%';
+                        return wm;
+                    }
+
+                    wrapper.appendChild(canvas);
+                    wrapper.appendChild(addWatermark(20, 20));
+                    wrapper.appendChild(addWatermark(70, 70));
+
+                    container.appendChild(wrapper);
+                }
+
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = '<p style="color:white">فشل تحميل الملف: ' + error.message + '</p>';
+            }
+        };
+
+        window.openSecureVideo = function (url) {
+            const modal = document.getElementById('videoPlayerModal');
+            const video = document.getElementById('secureVideo');
+            modal.style.display = 'flex';
+            video.src = url;
+            video.play();
+        };
+    </script>
+
+
+</body>
+
+</html>

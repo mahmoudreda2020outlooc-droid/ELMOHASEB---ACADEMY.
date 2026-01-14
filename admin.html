@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التحكم - إضافة محتوى</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .admin-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+
+        .preview-list {
+            margin-top: 2rem;
+            border-top: 1px solid #eee;
+            padding-top: 1rem;
+        }
+
+        .preview-item {
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .delete-btn {
+            color: red;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav style="background: #333; padding: 1rem; color: white;">
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">~Eng Ammar Mohammed</h3>
+        </div>
+    </nav>
+
+    <div class="container">
+        // --- Dashboard Tabs ---
+        <div style="display:flex; justify-content:center; margin-bottom: 2rem; border-bottom: 2px solid #ddd;">
+            <button class="tab-btn active" onclick="switchTab('content-tab', event)">📚 إدارة المحتوى</button>
+            <button class="tab-btn" onclick="switchTab('users-tab', event)">👥 إدارة الطلاب</button>
+            <button class="tab-btn" onclick="switchTab('logs-tab', event)">🔔 سجل الحماية</button>
+        </div>
+
+        <!-- CONTENT TAB -->
+        <div id="content-tab" class="admin-tab active">
+            <!-- (Content Tab Logic Unchanged) -->
+            <div class="admin-container">
+                <h2>إضافة محتوى جديد</h2>
+                <form id="uploadForm">
+                    <div class="form-group">
+                        <label>المادة</label>
+                        <select id="subject" required>
+                            <option value="math">الرياضيات</option>
+                            <option value="geo">الجغرافيا</option>
+                            <option value="eng">اللغة الإنجليزية</option>
+                            <option value="fr">اللغة الفرنسية</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>القسم</label>
+                        <select id="section" required>
+                            <option value="videos">محاضرات (فيديو)</option>
+                            <option value="pdfs">ملازم (PDF)</option>
+                            <option value="sheets">شيتات</option>
+                            <option value="exams">امتحانات</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>عنوان المحتوى</label>
+                        <input type="text" id="title" placeholder="مثال: المحاضرة الأولى / شيت 1" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>وصف بسيط</label>
+                        <input type="text" id="desc" placeholder="مثال: مدة الشرح 40 دقيقة / 10 صفحات">
+                    </div>
+
+                    <div class="form-group">
+                        <label>مصدر الملف</label>
+                        <div style="display:flex; gap:10px; margin-bottom:10px;">
+                            <input type="radio" name="sourceType" value="url" checked onchange="toggleSource()"> رابط
+                            خارجي (URL)
+                            <input type="radio" name="sourceType" value="file" onchange="toggleSource()"> رفع من الجهاز
+                            (فيديو / PDF)
+                        </div>
+
+                        <div id="urlInputGroup">
+                            <input type="url" id="link" placeholder="https://...">
+                        </div>
+
+                        <div id="fileInputGroup" style="display:none;">
+                            <input type="file" id="fileInput" accept=".pdf,.mp4">
+                            <small style="color:green;">✅ يمكنك الآن رفع ملفات كبيرة (فيديو أو PDF).</small>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">نشر المحتوى</button>
+                </form>
+
+                <div class="preview-list">
+                    <h3>المحتوى المضاف</h3>
+                    <div id="contentList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- USERS TAB -->
+        <div id="users-tab" class="admin-tab" style="display:none;">
+            <div class="admin-container">
+                <h2>إضافة طالب جديد</h2>
+                <form id="addUserForm">
+                    <div class="form-group">
+                        <label>الاسم الأول</label>
+                        <input type="text" id="newFirstName" placeholder="مثال: أحمد" required>
+                    </div>
+                    <div class="form-group">
+                        <label>اسم العائلة</label>
+                        <input type="text" id="newLastName" placeholder="مثال: محمد" required>
+                    </div>
+                    <div class="form-group">
+                        <label>البريد الإلكتروني</label>
+                        <input type="email" id="newEmail" placeholder="مثال: student@batucenter.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>اسم المستخدم (للدخول)</label>
+                        <input type="text" id="newUsername" placeholder="مثال: student50" required>
+                    </div>
+                    <div class="form-group">
+                        <label>كلمة المرور</label>
+                        <input type="text" id="newPassword" placeholder="مثال: 123456" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="background:#28a745; width:100%;">إنشاء
+                        حساب</button>
+                </form>
+
+                <div class="preview-list">
+                    <h3>قائمة الطلاب المسجلين</h3>
+                    <div id="userList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOGS TAB -->
+        <div id="logs-tab" class="admin-tab" style="display:none;">
+            <div class="admin-container">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h2>⚠️ سجل الحماية والمخالفات</h2>
+                    <div>
+                        <button onclick="renderLogs()" style="padding:5px 10px; cursor:pointer;">تحديث 🔄</button>
+                        <button onclick="clearLogs()"
+                            style="padding:5px 10px; cursor:pointer; background:#dc3545; color:white; border:none; margin-right:5px;">مسح
+                            السجل 🗑️</button>
+                    </div>
+                </div>
+                <div class="preview-list">
+                    <div
+                        style="display:flex; justify-content:space-between; margin-bottom:10px; font-weight:bold; color:#777; border-bottom:1px solid #ddd; padding-bottom:5px;">
+                        <span>تاريخ المخالفة</span>
+                        <span>الطالب</span>
+                        <span>نوع المخالفة</span>
+                    </div>
+                    <div id="logList">
+                        <!-- Logs will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .tab-btn {
+            padding: 1rem 2rem;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #777;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: #333;
+            border-bottom-color: #333;
+        }
+
+        .admin-tab {
+            animation: fadeIn 0.3s ease;
+        }
+
+        .log-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: #fff0f0;
+            border: 1px solid #ffcccc;
+            margin-bottom: 5px;
+            border-radius: 4px;
+        }
+    </style>
+
+    <!-- Load Appwrite SDK and Config -->
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <script src="js/appwrite-config.js"></script>
+    <script src="js/db-appwrite.js"></script>
+    <script>
+        // --- Tab Logic ---
+        function switchTab(tabId, event) {
+            document.querySelectorAll('.admin-tab').forEach(t => t.style.display = 'none');
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+            document.getElementById(tabId).style.display = 'block';
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
+        }
+
+        // --- Content Logic ---
+        function toggleSource() {
+            const urlRadio = document.querySelector('input[name="sourceType"][value="url"]');
+            const isUrl = urlRadio ? urlRadio.checked : true;
+            document.getElementById('urlInputGroup').style.display = isUrl ? 'block' : 'none';
+            document.getElementById('fileInputGroup').style.display = isUrl ? 'none' : 'block';
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (!+bytes) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        }
+
+        async function renderList() {
+            const list = document.getElementById('contentList');
+            try {
+                const materials = await window.dbGetAll();
+                list.innerHTML = '';
+                if (materials.length === 0) {
+                    list.innerHTML = '<p style="text-align:center; color:#999;">لا يوجد محتوى مضاف.</p>';
+                    return;
+                }
+                materials.slice().reverse().forEach((item) => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `
+                        <div>
+                            <strong>${item.title}</strong>
+                            <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; margin-right:5px;">
+                                ${item.subjectDisplay} - ${item.sectionDisplay}
+                            </span>
+                             <span style="font-size:0.75rem; color:#888;">(${formatBytes(item.size || 0)})</span>
+                        </div>
+                        <button class="delete-btn" onclick="deleteMaterial(${item.id})">🗑️</button>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) {
+                console.error("DB Error:", e);
+            }
+        }
+
+        window.deleteMaterial = async (id) => {
+            if (confirm('هل أنت متأكد من الحذف؟')) {
+                await window.dbDelete(id);
+                renderList();
+            }
+        };
+
+        // --- User Logic ---
+        async function renderUserList() {
+            const list = document.getElementById('userList');
+            try {
+                const users = await window.dbUserGetAll();
+                list.innerHTML = '';
+                if (users.length === 0) {
+                    list.innerHTML = '<p style="text-align:center; color:#999;">لا يوجد طلاب مسجلين.</p>';
+                    return;
+                }
+                users.reverse().forEach((user) => {
+                    const isSuspended = user.isSuspended === true;
+                    const statusColor = isSuspended ? 'red' : 'green';
+                    const statusText = isSuspended ? 'معطل' : 'نشط';
+                    const toggleBtnText = isSuspended ? 'تفعيل' : 'تعطيل';
+                    const toggleBtnColor = isSuspended ? '#28a745' : '#ffc107';
+
+                    const hasDevice = !!user.deviceId;
+                    const deviceStatus = hasDevice ? `<span style="color:blue; font-size:0.75rem;">📱 مرتبط بجهاز</span>` : `<span style="color:#aaa; font-size:0.75rem;">لم يسجل دخول</span>`;
+
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `
+                        <div style="display:flex; flex-direction:column;">
+                            <div>
+                                <strong>${user.username}</strong>
+                                <span style="font-size:0.8rem; color:#666; margin-right:5px;">${user.password}</span>
+                            </div>
+                            <div style="margin-top:2px;">
+                                <span style="font-size:0.75rem; color:${statusColor}; font-weight:bold;">${statusText}</span> - ${deviceStatus}
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end;">
+                             ${hasDevice ?
+                            `<button class="delete-btn" style="color:#333; background:#e0e0e0; padding:2px 6px; font-size:0.8rem; border-radius:4px;" onclick="resetDevice(${user.id})">فك الجهاز 🔓</button>`
+                            : ''}
+                            <button class="delete-btn" style="color:black; background:${toggleBtnColor}; padding:2px 8px; font-size:0.8rem; border-radius:4px;" onclick="toggleUserSuspension(${user.id}, ${!isSuspended})">
+                                ${toggleBtnText}
+                            </button>
+                            <button class="delete-btn" onclick="deleteUser(${user.id})" title="حذف نهائي">🗑️</button>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error("User DB Error:", e); }
+        }
+
+        window.toggleUserSuspension = async (id, suspendStatus) => {
+            try {
+                const users = await window.dbUserGetAll();
+                const user = users.find(u => u.id === id);
+                if (user) {
+                    user.isSuspended = suspendStatus;
+                    await window.dbUserUpdate(user);
+                    renderUserList();
+                }
+            } catch (e) { console.error(e); }
+        };
+
+        window.resetDevice = async (id) => {
+            if (!confirm("هل تريد فك ارتباط هذا الطالب بجهازه الحالي للسماح له بالدخول من جهاز جديد؟")) return;
+            try {
+                const users = await window.dbUserGetAll();
+                const user = users.find(u => u.id === id);
+                if (user) {
+                    user.deviceId = null; // Clear device
+                    await window.dbUserUpdate(user);
+                    renderUserList();
+                    alert("تم فك ارتباط الجهاز بنجاح. يمكن للطالب الدخول من جهاز جديد الآن.");
+                }
+            } catch (e) { console.error(e); }
+        };
+
+        window.deleteUser = async (id) => {
+            if (confirm('هل أنت متأكد من حذف هذا الطالب نهائياً؟')) {
+                await window.dbUserDelete(id);
+                renderUserList();
+            }
+        };
+
+        // --- Log Logic ---
+        async function renderLogs() {
+            const list = document.getElementById('logList');
+            try {
+                const logs = await window.dbLogGetAll();
+                list.innerHTML = '';
+                if (logs.length === 0) {
+                    list.innerHTML = '<p style="text-align:center; color:#999; margin-top:10px;">لا توجد مخالفات مسجلة حتى الآن ✅</p>';
+                    return;
+                }
+                // Sort by date desc
+                logs.sort((a, b) => b.timestamp - a.timestamp).forEach((log) => {
+                    const dateStr = new Date(log.timestamp).toLocaleString('ar-EG');
+                    const div = document.createElement('div');
+                    div.className = 'log-item';
+                    div.innerHTML = `
+                         <span style="font-size:0.8rem; color:#666;">${dateStr}</span>
+                         <span style="font-weight:bold; color:#000;">${log.username}</span>
+                         <span style="color:red; font-weight:bold;">${log.type} 📸</span>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error("Log DB Error:", e); }
+        }
+
+        async function clearLogs() {
+            if (confirm("هل أنت متأكد من مسح جميع السجلات؟ لا يمكن التراجع.")) {
+                try {
+                    await window.dbLogClearAll();
+                    renderLogs(); // Refresh list
+                } catch (e) {
+                    alert("فشل المسح: " + e.message);
+                }
+            }
+        }
+
+        // --- Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            toggleSource();
+            renderList();
+            renderUserList();
+            renderLogs();
+        });
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'جاري الحفظ... ⏳';
+
+            try {
+                const subjectSelect = document.getElementById('subject');
+                const sectionSelect = document.getElementById('section');
+                const isUrl = document.querySelector('input[name="sourceType"][value="url"]').checked;
+                let finalUrl = '';
+                let fileSize = 0;
+
+                if (isUrl) {
+                    finalUrl = document.getElementById('link').value;
+                    if (!finalUrl) { throw new Error('يرجى وضع الرابط'); }
+                } else {
+                    const fileInput = document.getElementById('fileInput');
+                    if (fileInput.files.length === 0) { throw new Error('يرجى اختيار ملف'); }
+                    const file = fileInput.files[0];
+                    fileSize = file.size;
+                    finalUrl = file;
+                }
+
+                const newMaterial = {
+                    id: Date.now(),
+                    subjectId: subjectSelect.value,
+                    subjectDisplay: subjectSelect.options[subjectSelect.selectedIndex].text,
+                    sectionId: sectionSelect.value,
+                    sectionDisplay: sectionSelect.options[sectionSelect.selectedIndex].text,
+                    title: document.getElementById('title').value,
+                    desc: document.getElementById('desc').value,
+                    url: finalUrl,
+                    isBlob: !isUrl,
+                    size: fileSize,
+                    date: new Date().toISOString()
+                };
+
+                await window.dbAdd(newMaterial);
+                e.target.reset();
+                document.querySelector('input[name="sourceType"][value="url"]').checked = true;
+                toggleSource();
+                renderList();
+                alert('✅ تمت الإضافة بنجاح');
+            } catch (err) {
+                alert('خطأ: ' + err.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'نشر المحتوى';
+            }
+        });
+
+        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const firstName = document.getElementById('newFirstName').value.trim();
+            const lastName = document.getElementById('newLastName').value.trim();
+            const email = document.getElementById('newEmail').value.trim();
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value.trim();
+
+            if (username.length < 3) return alert("اسم المستخدم قصير جداً");
+
+            try {
+                await window.dbUserAdd({
+                    id: Date.now(),
+                    firstName: firstName,
+                    lastName: lastName,
+                    email: email,
+                    username: username,
+                    password: password, // In real app, hash this!
+                    createdAt: new Date().toISOString()
+                });
+                e.target.reset();
+                renderUserList();
+                alert('✅ تم إنشاء الحساب للطالب: ' + username);
+            } catch (err) {
+                // Error already handled by dbUserAdd
+            }
+        });
+    </script>
+</body>
+
+</html>

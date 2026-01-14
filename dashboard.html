@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة الطالب - معادلة كلية التجارة</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .subject-card {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .subject-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .subject-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: 1px solid white;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+    <!-- Load Appwrite SDK and Config -->
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <script src="js/appwrite-config.js"></script>
+    <script src="js/db-appwrite.js"></script>
+    <script>
+        // --- SECURITY ---
+        function initSecurity() {
+            document.addEventListener('contextmenu', event => event.preventDefault());
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || (e.ctrlKey && e.key ===
+                    'U')) { e.preventDefault(); return false; }
+                if ((e.ctrlKey && e.key === 'p') || (e.ctrlKey && e.key === 's')) {
+                    e.preventDefault(); alert("Action disabled");
+                    return false;
+                }
+                if (e.key === 'PrintScreen') {
+                    navigator.clipboard.writeText(""); alert("No Screenshots");
+                    document.body.style.display = 'none'; setTimeout(() => { document.body.style.display = 'block'; }, 1000);
+                }
+            });
+        }
+
+        // --- LOGIC ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            initSecurity();
+
+            // Check Login
+            const displayName = localStorage.getItem('user_display_name');
+            const userEmail = localStorage.getItem('user_email');
+
+            if (!userEmail) {
+                // console.log("No user logged in (Dev Mode)");
+                // Redirect if strict: window.location.href = 'index.html';
+            }
+
+            // Set Welcome Message
+            const nameToDisplay = displayName || (userEmail ? userEmail.split('@')[0] : 'طالب');
+            document.getElementById('welcomeMsg').textContent = `مرحبا، ${nameToDisplay}`;
+
+            // --- AVATAR LOGIC ---
+            try {
+                // Ensure helper is loaded. If not, we might need to load it dynamically or assume it's there.
+                // dashboard.html didn't include db-local.js in the head in previous state, checking...
+                // Using simple dynamic import if needed, or better, assuming db-local.js should be included.
+                // Assuming we add db-local.js to head.
+
+                if (window.dbInit) {
+                    await window.dbInit();
+                    const users = await window.dbUserGetAll();
+                    const currentUser = users.find(u => u.username === displayName);
+
+                    if (currentUser) {
+                        const defaultAvatar =
+                            "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiIHdpZHRoPSIyNHB4IiBoZWlnaHQ9IjI0cHgiPjxwYXRoIGQ9Ik0xMiAxMkMxNC4yMSAxMiAxNiAxMC4yMSAxNiA4QzE2IDUuNzkgMTQuMjEgNCAxMiA0QzkuNzkgNCA4IDUuNzkgOCA4QzggMTAuMjEgOS43OSAxMiAxMiAxMlpNMTIgMTRDOS4zMyAxNCA0IDE1LjMzIDQgMThWMjBIMjBWMThDMjAgMTUuMzMgMTQuNjcgMTQgMTIgMTRaIi8+PC9zdmc+";
+                        const deleteBtn = document.getElementById('deleteAvatarBtn');
+
+                        const updateAvatarUI = (src) => {
+                            const avatarEl = document.getElementById('userAvatar');
+                            if (avatarEl) avatarEl.src = src;
+                            if (src !== defaultAvatar && deleteBtn) {
+                                deleteBtn.style.display = 'flex';
+                            } else if (deleteBtn) {
+                                deleteBtn.style.display = 'none';
+                            }
+                        };
+
+                        if (currentUser.avatar) {
+                            updateAvatarUI(currentUser.avatar);
+                        }
+
+                        window.deleteUserAvatar = async (e) => {
+                            e.stopPropagation();
+                            if (confirm("هل تريد حذف الصورة الشخصية؟")) {
+                                currentUser.avatar = null;
+                                await window.dbUserUpdate(currentUser);
+                                updateAvatarUI(defaultAvatar);
+                            }
+                        };
+
+                        const fileInput = document.getElementById('avatarUpload');
+                        fileInput.addEventListener('change', async (e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                                if (file.size > 2 * 1024 * 1024) {
+                                    alert("الصورة كبيرة جداً! الحد الأقصى 2 ميجا.");
+                                    return;
+                                }
+                                const reader = new FileReader();
+                                reader.onload = async function (evt) {
+                                    const base64Image = evt.target.result;
+                                    updateAvatarUI(base64Image);
+                                    currentUser.avatar = base64Image;
+                                    await window.dbUserUpdate(currentUser);
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error("Avatar Error:", e);
+            }
+
+            document.getElementById('logoutBtn').addEventListener('click', async () => {
+                localStorage.removeItem('user_email');
+                localStorage.removeItem('user_display_name');
+                window.location.href = 'index.html';
+            });
+        });
+    </script>
+</head>
+
+<body>
+
+    <nav style="background: var(--primary-color); padding: 0.5rem 1rem; color: white;">
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>منصة المعادلة</h3>
+
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <!-- Hidden File Input for Avatar Upload -->
+                <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
+
+                <!-- Profile Section -->
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <div style="position: relative; cursor: pointer;" title="تغيير الصورة">
+                        <img id="userAvatar"
+                            src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiIHdpZHRoPSIyNHB4IiBoZWlnaHQ9IjI0cHgiPjxwYXRoIGQ9Ik0xMiAxMkMxNC4yMSAxMiAxNiAxMC4yMSAxNiA4QzE2IDUuNzkgMTQuMjEgNCAxMiA0QzkuNzkgNCA4IDUuNzkgOCA4QzggMTAuMjEgOS43OSAxMiAxMiAxMlpNMTIgMTRDOS4zMyAxNCA0IDE1LjMzIDQgMThWMjBIMjBWMThDMjAgMTUuMzMgMTQuNjcgMTQgMTIgMTRaIi8+PC9zdmc+"
+                            onclick="document.getElementById('avatarUpload').click()"
+                            style="width: 35px; height: 35px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); object-fit: cover;">
+
+                        <!-- Delete Button (Hidden by default) -->
+                        <div id="deleteAvatarBtn" title="حذف الصورة"
+                            style="display:none; position: absolute; bottom: -5px; right: -5px; background: red; color: white; border-radius: 50%; width: 15px; height: 15px; font-size: 10px; align-items: center; justify-content: center; z-index: 10;"
+                            onclick="window.deleteUserAvatar(event)">
+                            x
+                        </div>
+                    </div>
+                    <span id="welcomeMsg" style="font-weight: bold; cursor: pointer;"
+                        onclick="document.getElementById('avatarUpload').click()">مرحبا</span>
+                </div>
+
+                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.3);"></div>
+                <button id="logoutBtn" class="logout-btn">تسجيل خروج</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div style="margin-top: 2rem;">
+            <h1>المواد الدراسية</h1>
+            <p>اختر المادة للدخول إلى المحاضرات والملفات</p>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Subject 1 -->
+            <a href="subject.html?id=math" class="subject-card">
+                <div class="subject-icon">📐</div>
+                <h2>الرياضيات</h2>
+                <p>Mathematics</p>
+            </a>
+
+            <!-- Subject 2 -->
+            <a href="subject.html?id=geo" class="subject-card">
+                <div class="subject-icon">🌍</div>
+                <h2>الجغرافيا</h2>
+                <p>Geography</p>
+            </a>
+
+            <!-- Subject 3 -->
+            <a href="subject.html?id=eng" class="subject-card">
+                <div class="subject-icon">🇬🇧</div>
+                <h2>اللغة الإنجليزية</h2>
+                <p>English</p>
+            </a>
+
+            <!-- Subject 4 -->
+            <a href="subject.html?id=fr" class="subject-card">
+                <div class="subject-icon">🇫🇷</div>
+                <h2>اللغة الفرنسية</h2>
+                <p>French</p>
+            </a>
+        </div>
+    </div>
+</body>
+
+</html>

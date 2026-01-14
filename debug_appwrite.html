@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <title>فاحص Appwrite - Diagnostic Tool</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: #1a1a1a;
+            color: white;
+            padding: 2rem;
+        }
+
+        .card {
+            background: #2a2a2a;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            border: 1px solid #444;
+        }
+
+        .success {
+            color: #00ff00;
+        }
+
+        .error {
+            color: #ff4444;
+        }
+
+        .warning {
+            color: #ffaa00;
+        }
+
+        pre {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            color: #0f0;
+            font-size: 0.8rem;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #e91e63;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔍 فاحص اتصال Appwrite</h1>
+    <p>الأداة دي هتفحص كل حاجة في Appwrite عشان نعرف ليه الحفظ مش شغال.</p>
+
+    <button onclick="runDiagnostics()">بدأ الفحص الآن 🚀</button>
+
+    <div id="results"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <script src="js/appwrite-config.js"></script>
+    <script>
+        async function runDiagnostics() {
+            const results = document.getElementById('results');
+            results.innerHTML = '';
+
+            function log(title, status, details = '') {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `
+                    <h3 class="${status}">${title}</h3>
+                    ${details ? `<pre>${details}</pre>` : ''}
+                `;
+                results.appendChild(div);
+            }
+
+            const { client, databases, DB_ID, COLLECTIONS } = window.appwrite;
+
+            // 1. Check Configuration
+            log('إعدادات الاتصال', 'success',
+                `Endpoint: ${client.config.endpoint}\nProject ID: ${client.config.project}\nDatabase ID: ${DB_ID}`);
+
+            // 2. Check Database Access (Smoke Test)
+            try {
+                // Try listing documents to check connectivity
+                const docs = await databases.listDocuments(DB_ID, COLLECTIONS.MATERIALS, [Appwrite.Query.limit(1)]);
+                log('اتصال قاعدة البيانات', 'success', `تم الاتصال بنجاح. عدد الوثائق: ${docs.total}`);
+            } catch (e) {
+                log('اتصال قاعدة البيانات', 'error', `فشل الوصول للقاعدة: ${e.message}\n(كود الخطأ: ${e.code || 'غير معروف'})`);
+                if (e.message.includes('fetch')) {
+                    log('تحليل السبب', 'error', 'غالباً المشكلة هي CORS لأنك بتفتح الملف من file://.\nجرب تشغل الموقع بـ Live Server.');
+                }
+            }
+
+            // 3. Check Collections Availability
+            const cols = ['MATERIALS', 'USERS', 'LOGS'];
+            for (const colKey of cols) {
+                const colId = COLLECTIONS[colKey];
+                try {
+                    await databases.listDocuments(DB_ID, colId, [Appwrite.Query.limit(1)]);
+                    log(`الكوليكشن ${colKey}`, 'success', `المعرف: ${colId}\nالحالة: متاح وقابل للقراءة بنجاح.`);
+                } catch (e) {
+                    if (e.code === 404) {
+                        log(`الكوليكشن ${colKey}`, 'error', `غير موجود! تأكد من إنشاء كوليكشن بـ ID: ${colId}`);
+                    } else if (e.code === 401 || e.code === 403) {
+                        log(`الكوليكشن ${colKey}`, 'warning', `موجود ولكن لا تملك صلاحية القراءة.\nلازم تروح Appwrite -> Collection -> Settings -> Permissions وتضيف "Any" وتفعل Read.`);
+                    } else if (e.message.includes('fetch')) {
+                        // Already logged above
+                    } else {
+                        log(`الكوليكشن ${colKey}`, 'error', `خطأ: ${e.message}`);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

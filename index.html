@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة معادلة كلية التجارة - تسجيل الدخول</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Load Appwrite SDK and Config -->
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <script src="js/appwrite-config.js"></script>
+    <script src="js/db-appwrite.js"></script>
+    <script>
+        // --- CONFIG ---
+        // Admin Credentials
+        const ADMIN_USER = "admin";
+        const ADMIN_PASS = "admin123";
+
+        // --- SECURITY ---
+        function initSecurity() {
+            document.addEventListener('contextmenu', event => event.preventDefault());
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || (e.ctrlKey && e.key === 'U')) { e.preventDefault(); return false; }
+                if ((e.ctrlKey && e.key === 'p') || (e.ctrlKey && e.key === 's')) { e.preventDefault(); alert("Action disabled"); return false; }
+                if (e.key === 'PrintScreen') {
+                    navigator.clipboard.writeText("");
+                    alert("Taking screenshots is prohibited.");
+                    // document.body.style.display = 'none';
+                    // setTimeout(() => { document.body.style.display = 'block'; }, 1000);
+                }
+            });
+        }
+
+        // --- DEVICE FINGERPRINT ---
+        function getDeviceFingerprint() {
+            // Simple but effective for local testing: OS + Browser + Screen + Timezone
+            const data = [
+                navigator.userAgent,
+                // screen.height, // Removed height/width as they can change on zoom/resize slightly
+                // screen.width, 
+                Intl.DateTimeFormat().resolvedOptions().timeZone
+            ];
+            // Simple hash
+            let str = data.join('|');
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32bit integer
+            }
+            return Math.abs(hash).toString(16);
+        }
+
+        // --- APP ENTRY ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initSecurity();
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) {
+                loginForm.addEventListener('submit', handleLogin);
+            }
+        });
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const usernameInput = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const messageEl = document.getElementById('loginMessage');
+
+            messageEl.style.display = 'none';
+            messageEl.textContent = '';
+
+            try {
+                // 1. Check if Admin
+                if (usernameInput === ADMIN_USER && password === ADMIN_PASS) {
+                    localStorage.setItem('user_role', 'admin');
+                    localStorage.setItem('user_email', 'admin@center.com');
+                    window.location.href = 'admin.html';
+                    return;
+                }
+
+                // 2. Check Database for Student
+                if (!window.dbUserLogin) {
+                    throw new Error("Local DB not loaded.");
+                }
+
+                const user = await window.dbUserLogin(usernameInput, password);
+
+                if (user) {
+                    if (user.isSuspended) {
+                        throw new Error("⛔ تم تعطيل هذا الحساب. يرجى مراجعة الإدارة.");
+                    }
+
+                    // Device Check logic
+                    const currentDevice = getDeviceFingerprint();
+
+                    if (user.deviceId) {
+                        if (user.deviceId !== currentDevice) {
+                            throw new Error("⛔ غير مسموح بالدخول من جهاز جديد. الحساب مرتبط بجهاز آخر.");
+                        }
+                    } else {
+                        // First time login - Bind device
+                        user.deviceId = currentDevice;
+                        await window.dbUserUpdate(user); // Confirm binding
+                    }
+
+                    // Success
+                    localStorage.setItem('user_role', 'student');
+                    localStorage.setItem('user_display_name', user.username);
+                    localStorage.setItem('user_email', user.username + '@student.com'); // Mock email
+                    window.location.href = 'dashboard.html';
+                } else {
+                    throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة");
+                }
+
+            } catch (error) {
+                console.error(error);
+                messageEl.textContent = 'فشل تسجيل الدخول: ' + (error.message || "خطأ غير معروف");
+                messageEl.style.display = 'block';
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="security-overlay">
+        <h2>⚠️ تحذير أمني</h2>
+        <p>تم اكتشاف محاولة تصوير أو تسجيل للشاشة.</p>
+        <p>سيتم إغلاق الحساب في حالة التكرار.</p>
+    </div>
+
+    <div class="login-wrapper">
+        <div class="card login-card">
+            <div class="login-header">
+                <h1>معادلة كلية التجارة</h1>
+                <p>بوابة الطالب الإلكترونية</p>
+            </div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">اسم المستخدم</label>
+                    <input type="text" id="username" required placeholder="User123">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">كلمة المرور</label>
+                    <input type="password" id="password" required placeholder="••••••••">
+                </div>
+
+                <div id="loginMessage" class="error-msg"></div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%">تسجيل الدخول</button>
+            </form>
+
+            <div style="margin-top: 1.5rem; font-size: 0.85rem; color: #777;">
+                <p>يسمح بالدخول من جهاز واحد فقط.</p>
+                <p>جميع الحقوق محفوظة © 2026</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

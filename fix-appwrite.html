@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مُصلح قاعدة بيانات Appwrite</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: #f4f7f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        p {
+            color: #666;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .input-group {
+            margin: 1.5rem 0;
+            text-align: right;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        button {
+            background: #E91E63;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            width: 100%;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #C2185B;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        #logs {
+            margin-top: 1.5rem;
+            text-align: left;
+            background: #222;
+            color: #0f0;
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>مصلح Appwrite 🛠️</h1>
+        <p>الأداة دي هتنشئ لك الحقول اللي ناقصة في قاعدة البيانات أوتوماتيك عشان الحفظ يشتغل.</p>
+
+        <div class="input-group">
+            <label>API Key (هاته من Settings -> API Keys)</label>
+            <input type="password" id="apiKey" placeholder="ادخل المفتاح هنا...">
+        </div>
+
+        <button id="fixBtn">بدأ عملية الإصلاح الآن ✅</button>
+
+        <div id="logs"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <script src="js/appwrite-config.js"></script>
+    <script>
+        const fixBtn = document.getElementById('fixBtn');
+        const logsEl = document.getElementById('logs');
+        const apiKeyInput = document.getElementById('apiKey');
+
+        function log(msg, color = '#0f0') {
+            logsEl.style.display = 'block';
+            const line = document.createElement('div');
+            line.style.color = color;
+            line.innerHTML = `> ${msg}`;
+            logsEl.appendChild(line);
+            logsEl.scrollTop = logsEl.scrollHeight;
+        }
+
+        fixBtn.addEventListener('click', async () => {
+            const key = apiKeyInput.value.trim();
+            if (!key) return alert("يرجى إدخال الـ API Key أولاً");
+
+            fixBtn.disabled = true;
+            fixBtn.textContent = 'جاري الإصلاح... ⏳';
+            logsEl.innerHTML = '';
+
+            const { client, DB_ID, COLLECTIONS } = window.appwrite;
+
+            // We need to use server-side style headers if possible, 
+            // but the web SDK doesn't support API keys easily for security.
+            // WORKAROUND: We will use window.fetch to call the Appwrite API directly using the key.
+
+            const endpoint = client.config.endpoint;
+            const project = client.config.project;
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-Appwrite-Project': project,
+                'X-Appwrite-Key': key
+            };
+
+            async function createAttribute(collectionId, key, type, extra = {}) {
+                log(`إنشاء حقل: ${key} في ${collectionId}...`);
+                const url = `${endpoint}/databases/${DB_ID}/collections/${collectionId}/attributes/${type}`;
+
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({ key, ...extra })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        log(`✅ نجح: ${key}`, '#4CAF50');
+                    } else if (data.code === 409) {
+                        log(`ℹ️ موجود بالفعل: ${key}`, '#FFC107');
+                    } else {
+                        throw new Error(data.message);
+                    }
+                } catch (e) {
+                    log(`❌ فشل ${key}: ${e.message}`, '#F44336');
+                }
+            }
+
+            try {
+                log('بدأ العملية...');
+
+                // 1. Materials Attributes
+                const mAttrs = [
+                    { k: 'title', t: 'string', ex: { size: 255, required: true } },
+                    { k: 'url', t: 'string', ex: { size: 1000, required: true } },
+                    { k: 'desc', t: 'string', ex: { size: 1000, required: false } },
+                    { k: 'subjectId', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'subjectDisplay', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'sectionId', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'sectionDisplay', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'id', t: 'integer', ex: { required: true } },
+                    { k: 'size', t: 'integer', ex: { required: false } },
+                    { k: 'date', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'isBlob', t: 'boolean', ex: { required: true } },
+                    { k: 'storagePath', t: 'string', ex: { size: 255, required: false } }
+                ];
+
+                for (const a of mAttrs) {
+                    await createAttribute(COLLECTIONS.MATERIALS, a.k, a.t, a.ex);
+                }
+
+                log('---');
+
+                // 2. Users Attributes
+                const uAttrs = [
+                    { k: 'id', t: 'integer', ex: { required: true } },
+                    { k: 'firstName', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'lastName', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'email', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'username', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'password', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'passwordHash', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'createdAt', t: 'string', ex: { size: 100, required: false } },
+                    { k: 'creationDate', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'isSuspended', t: 'boolean', ex: { required: false } },
+                    { k: 'isActive', t: 'boolean', ex: { required: true } },
+                    { k: 'deviceId', t: 'string', ex: { size: 255, required: false } },
+                    { k: 'avatar', t: 'string', ex: { size: 1000000, required: false } } // Large for base64
+                ];
+
+                for (const a of uAttrs) {
+                    await createAttribute(COLLECTIONS.USERS, a.k, a.t, a.ex);
+                }
+
+                log('---');
+
+                // 3. Security Logs Attributes
+                log('إنشاء حقول سجلات الحماية (security_logs)...');
+                const lAttrs = [
+                    { k: 'userId', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'action', t: 'string', ex: { size: 255, required: true } },
+                    { k: 'details', t: 'string', ex: { size: 1000, required: false } },
+                    { k: 'timestamp', t: 'string', ex: { size: 100, required: true } },
+                    { k: 'ip', t: 'string', ex: { size: 50, required: false } }
+                ];
+
+                for (const a of lAttrs) {
+                    await createAttribute(COLLECTIONS.LOGS, a.k, a.t, a.ex);
+                }
+
+                log('---');
+                log('🎉 تمت العملية بنجاح! انتظر دقيقة ثم جرب الموقع الآن.', '#fff');
+                alert('✅ تم إصلاح قاعدة البيانات بنجاح! يمكنك الآن تجربة الإضافة من لوحة التحكم.');
+
+            } catch (err) {
+                log(`⛔ خطأ عام: ${err.message}`, '#F44336');
+            } finally {
+                fixBtn.disabled = false;
+                fixBtn.textContent = 'بدأ عملية الإصلاح الآن ✅';
+            }
+        });
+    </script>
+</body>
+
+</html>

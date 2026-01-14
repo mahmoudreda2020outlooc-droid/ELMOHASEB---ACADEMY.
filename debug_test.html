@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>System Diagnostic</title>
+    <!-- Load Firebase Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+    <script src="js/db-firebase.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+
+        .box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+
+        #logOutput {
+            white-space: pre-wrap;
+            background: #333;
+            color: #0f0;
+            padding: 10px;
+            height: 200px;
+            overflow: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🛠️ System Security Diagnostic</h1>
+
+    <div class="box">
+        <h3>1. Database Connection Test</h3>
+        <p>Status: <span id="dbStatus">Waiting...</span></p>
+        <p>DB Version: <span id="dbVersionDisplay">-</span></p>
+    </div>
+
+    <div class="box">
+        <h3>2. Manual Log Simulation</h3>
+        <button onclick="testLog()">🔴 Simulate Data Breach (Write to DB)</button>
+    </div>
+
+    <div class="box">
+        <h3>3. Read Logs (Admin View)</h3>
+        <button onclick="readLogs()">📖 Fetch All Logs</button>
+        <div id="logResults" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="box">
+        <h3>Console Output:</h3>
+        <div id="logOutput"></div>
+    </div>
+
+    <script>
+        function log(msg) {
+            const el = document.getElementById('logOutput');
+            el.textContent += `> ${msg}\n`;
+            console.log(msg);
+        }
+
+        async function initCheck() {
+            try {
+                log("Initializing DB connection...");
+                const db = await window.dbInit();
+                document.getElementById('dbStatus').textContent = "✅ Connected";
+                document.getElementById('dbStatus').style.color = "green";
+                document.getElementById('dbVersionDisplay').textContent = db.version;
+                log(`Success. DB Name: ${db.name}, Version: ${db.version}`);
+                log(`Object Stores: ${Array.from(db.objectStoreNames).join(', ')}`);
+
+                if (!db.objectStoreNames.contains('security_logs')) {
+                    log("❌ CRITICAL ERROR: 'security_logs' table is MISSING!");
+                    document.getElementById('dbStatus').textContent += " (Corrupted Schema)";
+                } else {
+                    log("✅ Schema looks correct ('security_logs' exists).");
+                }
+
+            } catch (e) {
+                document.getElementById('dbStatus').textContent = "❌ Failed: " + e.message;
+                log("DB Init Error: " + e);
+            }
+        }
+
+        async function testLog() {
+            log("Attempting to write log entry...");
+            try {
+                const entry = {
+                    id: Date.now(),
+                    username: 'Test_User_' + Math.floor(Math.random() * 1000),
+                    type: 'MANUAL_TEST_EVENT',
+                    timestamp: Date.now()
+                };
+                await window.dbLogAdd(entry);
+                log("✅ Write Success! ID: " + entry.id);
+            } catch (e) {
+                log("❌ Write Failed: " + e.message);
+            }
+        }
+
+        async function readLogs() {
+            log("Reading database...");
+            try {
+                const logs = await window.dbLogGetAll();
+                log(`Found ${logs.length} entries.`);
+
+                const html = logs.map(l =>
+                    `<div style="border-bottom:1px solid #eee; padding:5px;">
+                        <b>${new Date(l.timestamp).toLocaleTimeString()}</b>: ${l.username} - ${l.type}
+                    </div>`
+                ).join('');
+                document.getElementById('logResults').innerHTML = html || "No logs found.";
+            } catch (e) {
+                log("❌ Read Failed: " + e.message);
+            }
+        }
+
+        // Run init on load
+        initCheck();
+    </script>
+</body>
+
+</html>
