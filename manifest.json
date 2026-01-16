@@ -1,0 +1,21 @@
+{
+  "name": "ELMOHASEB ACADEMY",
+  "short_name": "Elmohaseb",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#fafafa",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "img/logo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "img/logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

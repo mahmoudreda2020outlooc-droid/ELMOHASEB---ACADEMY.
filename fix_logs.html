@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تشخيص مشاكل التسجيل (Logs Diagnostic)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .box {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin: 10px;
+        }
+
+        #status {
+            margin-top: 20px;
+            text-align: left;
+            background: #eee;
+            padding: 10px;
+            border-radius: 5px;
+            min-height: 100px;
+            font-family: monospace;
+            direction: ltr;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+    </style>
+    <!-- Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <script src="js/appwrite-config.js"></script>
+    <script src="js/db-appwrite.js"></script>
+</head>
+
+<body>
+    <div class="box">
+        <h1>🛠️ فحص نظام المخالفات</h1>
+        <p>هذه الأداة ستقوم بمحاولة إرسال "مخالفة تجريبية" إلى قاعدة البيانات لمعرفة سبب المشكلة.</p>
+
+        <button onclick="runTest()">▶️ بدء الاختبار</button>
+        <div id="status">Waiting to start...</div>
+    </div>
+
+    <script>
+        const log = (msg, type = 'info') => {
+            const el = document.getElementById('status');
+            const color = type === 'error' ? 'red' : (type === 'success' ? 'green' : 'black');
+            el.innerHTML += `<div style="color:${color}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+        };
+
+        async function runTest() {
+            document.getElementById('status').innerHTML = '';
+            log("Starting diagnostics...", 'info');
+
+            if (window.location.protocol === 'file:') {
+                log("⚠️ تحذير: أنت فاتح الملف مباشرة (Double Click).", 'error');
+                log("⛔ المتصفح بيمنع الاتصال لأسباب أمنية في نظام الملفات.", 'error');
+                log("💡 الحل: لازم تفتح الملف ده عن طريق Live Server من الـ VS Code (زي ما بتفتح الموقع).", 'black');
+                log("👉 Right Click -> Open with Live Server", 'blue');
+                alert("خطأ: أنت فاتح الملف غلط! \n\nلازم تفتحه بـ Live Server من البرنامج وليس Double Click.");
+                return;
+            }
+
+            if (!window.dbLogAdd) {
+                log("❌ Critical Error: dbLogAdd function is NOT loaded. Check script paths.", 'error');
+                return;
+            }
+
+            // 1. Check Config
+            log(`Config Loaded. Project ID: ${window.appwrite?.client?.config?.project}`, 'info');
+            log(`DB ID: ${window.appwrite?.DB_ID}`, 'info');
+            log(`Collection ID: ${window.appwrite?.COLLECTIONS?.LOGS}`, 'info');
+
+            const startObj = {
+                userId: 'Diag_User',
+                action: 'DIAGNOSTIC_TEST',
+                details: 'Testing connection from fix_logs.html',
+                timestamp: new Date().toISOString()
+            };
+
+            // 2. Try Add
+            try {
+                log("⏳ Attempting to write log to DB...", 'blue');
+                const res = await window.dbLogAdd(startObj);
+                console.log(res);
+                if (res && res.$id) {
+                    log(`✅ SUCCESS! Log written with ID: ${res.$id}`, 'success');
+                    log("🎉 قاعدة البيانات سليمة وتستقبل المخالفات بنجاح.", 'success');
+                    log("💡 إذا كانت المخالفات لا تسجل عند الضغط على PrintScreen، فالمشكلة في **الزرار** أو **المتصفح** وليس في السيرفر.", 'black');
+                } else {
+                    log("⚠️ Warning: Operation finished but no ID returned.", 'error');
+                }
+            } catch (e) {
+                console.error(e);
+                log(`❌ FAILED: ${e.message}`, 'error');
+                if (e.code === 401) {
+                    log("🗝️ السبب (401): نقص صلاحيات. Collection Permissions يجب أن تكون Role: Any -> Create.", 'error');
+                } else if (e.code === 400) {
+                    log("📋 السبب (400): البيانات غير مطابقة. تأكد من أن الـ Attributes (userId, action, details...) موجودة ونوعها String.", 'error');
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

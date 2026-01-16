@@ -63,10 +63,14 @@ window.dbAdd = async (item) => {
         } else if (errorMsg.includes("Attribute not found")) {
             errorMsg = "المتصفح لم يجد بعض الحقول في Appwrite. يرجى تشغيل ملف fix-appwrite.html أولاً.";
         } else if (errorCode === 400) {
-            errorMsg = "بيانات غير صالحة (Schema Mismatch). تأكد من أنواع الحقول (Integer/String). " + errorMsg;
+            if (errorMsg.includes("limit allowed for your plan")) {
+                errorMsg = "⚠️ حجم الملف كبير جداً بالنسبة للخطة المجانية في Appwrite. يرجى رفع ملف أصغر أو استخدام رابط خارجي (مثل Google Drive/YouTube).";
+            } else {
+                errorMsg = "بيانات غير صالحة (Schema Mismatch). تأكد من أنواع الحقول (Integer/String). " + errorMsg;
+            }
         }
 
-        alert("خطأ أثناء الحفظ (Code " + errorCode + "): " + errorMsg);
+        alert("خطأ (Code " + errorCode + "): " + errorMsg);
         throw e;
     }
 };
@@ -142,7 +146,9 @@ window.dbUserGetAll = async () => {
     const { databases, DB_ID, COLLECTIONS } = getAppwrite();
     try {
         if (!databases) throw new Error("Appwrite not initialized");
-        const response = await databases.listDocuments(DB_ID, COLLECTIONS.USERS);
+        const response = await databases.listDocuments(DB_ID, COLLECTIONS.USERS, [
+            Query.limit(100)
+        ]);
         return response.documents;
     } catch (e) {
         console.error("User GetAll Error:", e);
@@ -231,39 +237,116 @@ window.dbUserDelete = async (id) => {
 };
 
 // --- LOGS FUNCTIONS ---
-window.dbLogAdd = async (log) => {
-    const { databases, DB_ID, COLLECTIONS, ID } = getAppwrite();
+window.dbLogAdd = async (logData) => {
+    const { databases, storage, DB_ID, COLLECTIONS, BUCKET_ID, ID } = getAppwrite();
+    console.log("💾 Attempting to add security log:", logData);
     try {
         if (!databases) throw new Error("Appwrite not initialized");
-        await databases.createDocument(DB_ID, COLLECTIONS.LOGS, ID.unique(), log);
+
+        let screenshotUrl = logData.screenshotUrl || null;
+
+        // If screenshot is present, handle upload
+        if (logData.screenshot) {
+            try {
+                console.log("📤 Uploading violation screenshot...");
+                let fileToUpload;
+
+                if (logData.screenshot instanceof File) {
+                    fileToUpload = logData.screenshot;
+                } else if (logData.screenshot instanceof Blob) {
+                    fileToUpload = new File([logData.screenshot], `violation_${Date.now()}.png`, { type: 'image/png' });
+                } else if (typeof logData.screenshot === 'string' && logData.screenshot.startsWith('data:')) {
+                    // Convert Base64 (DataURL) to Blob then File
+                    const res = await fetch(logData.screenshot);
+                    const blob = await res.blob();
+                    fileToUpload = new File([blob], `violation_${Date.now()}.png`, { type: 'image/png' });
+                }
+
+                if (fileToUpload) {
+                    const uploadPromise = storage.createFile(BUCKET_ID, ID.unique(), fileToUpload);
+                    const response = await uploadPromise;
+                    screenshotUrl = storage.getFileView(BUCKET_ID, response.$id).href;
+                    console.log("✅ Screenshot uploaded: ", screenshotUrl);
+                } else {
+                    console.warn("⚠️ Screenshot data format not recognized (not File/Blob/DataURL).");
+                }
+            } catch (err) {
+                console.warn("⚠️ Screenshot upload failed (but continuing with log):", err);
+            }
+        }
+
+        console.log("🚀 dbLogAdd: Start mapping data...");
+        // Map to standard schema
+        const finalLog = {
+            userId: String(logData.userId || logData.username || 'Unknown Student').substring(0, 100),
+            action: String(logData.action || logData.type || 'Violation').substring(0, 255),
+            timestamp: new Date().toISOString(),
+            details: String(screenshotUrl || logData.details || window.location.href || '').substring(0, 1000),
+            ip: String(logData.ip || '').substring(0, 50)
+        };
+
+        console.log("📝 dbLogAdd: Sending to Appwrite:", finalLog);
+        const res = await databases.createDocument(DB_ID, COLLECTIONS.LOGS, ID.unique(), finalLog);
+        console.log("✅ dbLogAdd: Success! ID:", res.$id);
+        return res;
     } catch (e) {
-        console.error("Log Add Error:", e);
-        // We don't alert for logs to avoid interrupting the user during PrintScreen/etc
-        // and because log failure is less critical than material/user creation.
+        console.error("❌ dbLogAdd Error:", e);
+
+        const role = localStorage.getItem('user_role');
+        if (role === 'admin' || window.location.href.includes('admin.html')) {
+            alert("⚠️ خطأ في تسجيل المخالفة: " + (e.message || "خطأ غير معروف") +
+                "\nتأكد من وجود Attributes والصلاحيات.");
+        }
+        throw e;
     }
 };
 
 window.dbLogGetAll = async () => {
-    const { databases, DB_ID, COLLECTIONS } = getAppwrite();
+    const { databases, DB_ID, COLLECTIONS, Query } = getAppwrite();
     try {
         if (!databases) throw new Error("Appwrite not initialized");
-        const response = await databases.listDocuments(DB_ID, COLLECTIONS.LOGS);
-        return response.documents;
+
+        // Strategy Update: Always fetch unsorted first to guarantee data (bypassing Index issues)
+        // Then sort in client-side memory. This is safer for small/medium apps.
+        const response = await databases.listDocuments(DB_ID, COLLECTIONS.LOGS, [
+            Query.limit(100)
+        ]);
+
+        // Manual sort: Newest first
+        return response.documents.sort((a, b) => {
+            const tA = new Date(a.timestamp || a.$createdAt).getTime();
+            const tB = new Date(b.timestamp || b.$createdAt).getTime();
+            return tB - tA;
+        });
+
     } catch (e) {
         console.error("Log GetAll Error:", e);
-        return [];
+        throw e; // Propagate error to caller (Admin UI) so it shows "Failed" instead of "Empty"
     }
 };
 
 window.dbLogClearAll = async () => {
-    const { databases, DB_ID, COLLECTIONS } = getAppwrite();
+    const { databases, DB_ID, COLLECTIONS, Query } = getAppwrite();
     try {
         if (!databases) throw new Error("Appwrite not initialized");
-        const response = await databases.listDocuments(DB_ID, COLLECTIONS.LOGS);
-        for (const doc of response.documents) {
-            await databases.deleteDocument(DB_ID, COLLECTIONS.LOGS, doc.$id);
-        }
+
+        // Fetch logs to clear
+        const response = await databases.listDocuments(DB_ID, COLLECTIONS.LOGS, [
+            Query.limit(100)
+        ]);
+
+        console.log(`🧹 Clearing ${response.documents.length} logs...`);
+        const deletePromises = response.documents.map(doc =>
+            databases.deleteDocument(DB_ID, COLLECTIONS.LOGS, doc.$id)
+        );
+
+        await Promise.all(deletePromises);
+
+        // If there were 100, there might be more. Recursively call if needed or just tell user to refresh.
+        // For simplicity, we clear 100 at a time.
+        return true;
     } catch (e) {
         console.error("Log Clear Error:", e);
+        throw e;
     }
 };

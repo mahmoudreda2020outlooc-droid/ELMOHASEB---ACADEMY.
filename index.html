@@ -3,162 +3,353 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منصة معادلة كلية التجارة - تسجيل الدخول</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>منصة المحاسب التعليمية - v3.1</title>
+    <link rel="icon" href="img/logo.jpg" type="image/jpeg">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 
-    <!-- Load Appwrite SDK and Config -->
-    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
-    <script src="js/appwrite-config.js"></script>
-    <script src="js/db-appwrite.js"></script>
-    <script>
-        // --- CONFIG ---
-        // Admin Credentials
-        const ADMIN_USER = "admin";
-        const ADMIN_PASS = "admin123";
-
-        // --- SECURITY ---
-        function initSecurity() {
-            document.addEventListener('contextmenu', event => event.preventDefault());
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || (e.ctrlKey && e.key === 'U')) { e.preventDefault(); return false; }
-                if ((e.ctrlKey && e.key === 'p') || (e.ctrlKey && e.key === 's')) { e.preventDefault(); alert("Action disabled"); return false; }
-                if (e.key === 'PrintScreen') {
-                    navigator.clipboard.writeText("");
-                    alert("Taking screenshots is prohibited.");
-                    // document.body.style.display = 'none';
-                    // setTimeout(() => { document.body.style.display = 'block'; }, 1000);
-                }
-            });
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0d47a1;
+            --secondary: #1565c0;
+            --accent: #b8860b;
+            --accent-glow: rgba(184, 134, 11, 0.4);
+            --whatsapp: #25d366;
+            --white: #ffffff;
+            --text-dark: #333;
+            --text-muted: #555;
+            --bg-light: #f8f9fa;
         }
 
-        // --- DEVICE FINGERPRINT ---
-        function getDeviceFingerprint() {
-            // Simple but effective for local testing: OS + Browser + Screen + Timezone
-            const data = [
-                navigator.userAgent,
-                // screen.height, // Removed height/width as they can change on zoom/resize slightly
-                // screen.width, 
-                Intl.DateTimeFormat().resolvedOptions().timeZone
-            ];
-            // Simple hash
-            let str = data.join('|');
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                const char = str.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash; // Convert to 32bit integer
-            }
-            return Math.abs(hash).toString(16);
+        body {
+            background: var(--bg-light);
+            font-family: 'Cairo', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            line-height: 1.6;
         }
 
-        // --- APP ENTRY ---
-        document.addEventListener('DOMContentLoaded', () => {
-            initSecurity();
-            const loginForm = document.getElementById('loginForm');
-            if (loginForm) {
-                loginForm.addEventListener('submit', handleLogin);
+        /* --- Header Styles --- */
+        .landing-header {
+            background: var(--white);
+            padding: 10px 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-logo {
+            height: 45px;
+            width: 45px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+
+        .brand-name {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--primary);
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-nav {
+            padding: 8px 16px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .btn-whatsapp {
+            background: var(--whatsapp);
+            color: white;
+            box-shadow: 0 4px 10px rgba(37, 211, 102, 0.2);
+        }
+
+        .btn-login {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 10px rgba(13, 71, 161, 0.2);
+        }
+
+        .btn-nav:hover {
+            transform: translateY(-2px);
+            opacity: 0.95;
+        }
+
+        /* --- Hero Section --- */
+        .hero-section {
+            padding: 60px 20px;
+            text-align: center;
+            background: radial-gradient(circle at center, #ffffff 0%, #f0f4f8 100%);
+        }
+
+        .hero-title {
+            font-size: 2.2rem;
+            color: var(--primary);
+            font-weight: 900;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .hero-text {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            max-width: 700px;
+            margin: 0 auto 40px;
+            line-height: 1.8;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #d4af37, #b8860b);
+            color: white;
+            font-size: 1.2rem;
+            padding: 15px 40px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 800;
+            box-shadow: 0 10px 25px var(--accent-glow);
+            transition: all 0.3s ease;
+        }
+
+        .cta-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px var(--accent-glow);
+        }
+
+        /* --- Features Section --- */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            padding: 40px 20px 80px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: var(--white);
+            padding: 40px 30px;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+            border: 1px solid rgba(0, 0, 0, 0.02);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .feature-icon {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .feature-card h3 {
+            font-size: 1.4rem;
+            color: var(--primary);
+            margin-bottom: 12px;
+            font-weight: 800;
+        }
+
+        .feature-card p {
+            color: #777;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* --- Footer --- */
+        .main-footer {
+            background: var(--white);
+            padding: 40px 20px;
+            text-align: center;
+            border-top: 1px solid #eee;
+        }
+
+        .copyright {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+
+        .developer-credit {
+            font-size: 1rem;
+            font-weight: 800;
+            margin-top: 10px;
+        }
+
+        .dev-label {
+            color: #888;
+            font-weight: 400;
+        }
+
+        .dev-name {
+            color: #333;
+            margin: 0 5px;
+        }
+
+        .dev-phone {
+            color: var(--primary);
+        }
+
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 768px) {
+            .brand-name {
+                font-size: 1rem;
             }
-        });
 
-        async function handleLogin(e) {
-            e.preventDefault();
-            const usernameInput = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
-            const messageEl = document.getElementById('loginMessage');
+            .btn-nav {
+                padding: 6px 12px;
+                font-size: 0.8rem;
+            }
 
-            messageEl.style.display = 'none';
-            messageEl.textContent = '';
+            .hero-title {
+                font-size: 1.8rem;
+            }
 
-            try {
-                // 1. Check if Admin
-                if (usernameInput === ADMIN_USER && password === ADMIN_PASS) {
-                    localStorage.setItem('user_role', 'admin');
-                    localStorage.setItem('user_email', 'admin@center.com');
-                    window.location.href = 'admin.html';
-                    return;
-                }
+            .hero-text {
+                font-size: 0.95rem;
+                line-height: 1.6;
+            }
 
-                // 2. Check Database for Student
-                if (!window.dbUserLogin) {
-                    throw new Error("Local DB not loaded.");
-                }
+            .cta-button {
+                font-size: 1rem;
+                padding: 12px 30px;
+            }
 
-                const user = await window.dbUserLogin(usernameInput, password);
-
-                if (user) {
-                    if (user.isSuspended) {
-                        throw new Error("⛔ تم تعطيل هذا الحساب. يرجى مراجعة الإدارة.");
-                    }
-
-                    // Device Check logic
-                    const currentDevice = getDeviceFingerprint();
-
-                    if (user.deviceId) {
-                        if (user.deviceId !== currentDevice) {
-                            throw new Error("⛔ غير مسموح بالدخول من جهاز جديد. الحساب مرتبط بجهاز آخر.");
-                        }
-                    } else {
-                        // First time login - Bind device
-                        user.deviceId = currentDevice;
-                        await window.dbUserUpdate(user); // Confirm binding
-                    }
-
-                    // Success
-                    localStorage.setItem('user_role', 'student');
-                    localStorage.setItem('user_display_name', user.username);
-                    localStorage.setItem('user_email', user.username + '@student.com'); // Mock email
-                    window.location.href = 'dashboard.html';
-                } else {
-                    throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة");
-                }
-
-            } catch (error) {
-                console.error(error);
-                messageEl.textContent = 'فشل تسجيل الدخول: ' + (error.message || "خطأ غير معروف");
-                messageEl.style.display = 'block';
+            .features-grid {
+                padding-bottom: 40px;
             }
         }
-    </script>
+
+        @media (max-width: 480px) {
+            .landing-header {
+                padding: 10px 15px;
+            }
+
+            .brand-container {
+                gap: 6px;
+            }
+
+            .brand-logo {
+                height: 35px;
+                width: 35px;
+            }
+
+            .brand-name {
+                font-size: 0.85rem;
+            }
+
+            .header-actions {
+                gap: 6px;
+            }
+
+            .btn-nav {
+                padding: 5px 10px;
+                font-size: 0.75rem;
+            }
+
+            .hero-section {
+                padding: 40px 15px;
+            }
+
+            .hero-title {
+                font-size: 1.6rem;
+            }
+        }
+    </style>
 </head>
 
 <body>
-    <div id="security-overlay">
-        <h2>⚠️ تحذير أمني</h2>
-        <p>تم اكتشاف محاولة تصوير أو تسجيل للشاشة.</p>
-        <p>سيتم إغلاق الحساب في حالة التكرار.</p>
-    </div>
 
-    <div class="login-wrapper">
-        <div class="card login-card">
-            <div class="login-header">
-                <h1>معادلة كلية التجارة</h1>
-                <p>بوابة الطالب الإلكترونية</p>
-            </div>
-
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="username">اسم المستخدم</label>
-                    <input type="text" id="username" required placeholder="User123">
-                </div>
-
-                <div class="form-group">
-                    <label for="password">كلمة المرور</label>
-                    <input type="password" id="password" required placeholder="••••••••">
-                </div>
-
-                <div id="loginMessage" class="error-msg"></div>
-
-                <button type="submit" class="btn btn-primary" style="width: 100%">تسجيل الدخول</button>
-            </form>
-
-            <div style="margin-top: 1.5rem; font-size: 0.85rem; color: #777;">
-                <p>يسمح بالدخول من جهاز واحد فقط.</p>
-                <p>جميع الحقوق محفوظة © 2026</p>
-            </div>
+    <header class="landing-header">
+        <div class="brand-container">
+            <img src="img/logo.jpg" alt="Logo" class="brand-logo">
+            <h1 class="brand-name">ELMOHASEB ACADEMY</h1>
         </div>
-    </div>
+        <div class="header-actions">
+            <a href="https://wa.me/201027783480" target="_blank" class="btn-nav btn-whatsapp">
+                تواصل معنا
+            </a>
+            <a href="login.html" class="btn-nav btn-login">
+                تسجيل الدخول
+            </a>
+        </div>
+    </header>
+
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">حقق حلمك والتحق بكلية التجارة</h1>
+            <p class="hero-text">
+                أهلاً بك في منصة المحاسب التعليمية، بوابتك الأولى لاجتياز معادلة كلية التجارة بنجاح.
+                نقدم لك محتوى تعليمي متميز، امتحانات دورية، ومتابعة مستمرة لتضمن تفوقك. مشوار الألف ميل يبدأ بخطوة، ابدأ
+                رحلتك الآن!
+            </p>
+            <a href="login.html" class="cta-button">ابدأ رحلتك التعليمية الآن</a>
+        </div>
+    </section>
+
+    <section class="features-grid">
+        <div class="feature-card">
+            <span class="feature-icon">🎓</span>
+            <h3>نخبة من المحاضرين</h3>
+            <p>تعلم على يد أفضل الأساتذة المتخصصين في المعادلة.</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">📝</span>
+            <h3>امتحانات تفاعلية</h3>
+            <p>اختبر مستواك باستمرار مع بنك أسئلة متجدد.</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">📚</span>
+            <h3>محتوى شامل</h3>
+            <p>جميع المواد الدراسية مشروحة بطريقة مبسطة واحترافية.</p>
+        </div>
+    </section>
+
+    <footer class="main-footer">
+        <p class="copyright">© ELMOHASEB ACADEMY 2026. جميع الحقوق محفوظة.</p>
+        <div class="developer-credit" dir="ltr">
+            <span class="dev-label">Developed by</span>
+            <span class="dev-name">MAHMOUD REDA</span>
+            <span class="dev-phone">01004897420</span>
+        </div>
+    </footer>
+
+    <script>
+        // Version control to clear cache on update
+        const CURRENT_VERSION = '3.2';
+        if (localStorage.getItem('platform_v') !== CURRENT_VERSION) {
+            localStorage.clear();
+            localStorage.setItem('platform_v', CURRENT_VERSION);
+            // Optional: unregister service workers if used
+        }
+    </script>
 </body>
 
 </html>

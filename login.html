@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة معادلة كلية التجارة - تسجيل الدخول</title>
+    <link rel="icon" href="img/logo.jpg" type="image/jpeg">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=1.3">
+
+    <!-- Load Appwrite SDK and Config -->
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <script src="js/appwrite-config.js?v=1.1"></script>
+    <script src="js/db-appwrite.js?v=1.1"></script>
+    <script>
+        // --- CONFIG ---
+        // Admin Credentials
+        const ADMIN_USER = "admin";
+        const ADMIN_PASS = "admin123";
+
+        // --- SECURITY ---
+        function initSecurity() {
+            document.addEventListener('contextmenu', event => event.preventDefault());
+
+            const showOverlay = () => {
+                const overlay = document.getElementById('security-overlay');
+                if (overlay) {
+                    overlay.style.display = 'flex';
+                    setTimeout(() => { overlay.style.display = 'none'; }, 3000);
+                }
+            };
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || (e.ctrlKey && e.key === 'U')) { e.preventDefault(); return false; }
+                if ((e.ctrlKey && e.key === 'p') || (e.ctrlKey && e.key === 's')) { e.preventDefault(); alert("Action disabled"); return false; }
+                if (e.key === 'PrintScreen') {
+                    navigator.clipboard.writeText("");
+                    showOverlay();
+                    alert("Taking screenshots is prohibited.");
+                    document.body.style.opacity = '0';
+                    setTimeout(() => { document.body.style.opacity = '1'; }, 1000);
+
+                    if (window.dbLogAdd) {
+                        window.dbLogAdd({ userId: 'Guest/Login', action: 'PrintScreen Attempt', timestamp: new Date().toISOString() });
+                    }
+                }
+            });
+            window.addEventListener('focus', () => {
+                const overlay = document.getElementById('security-overlay');
+                if (overlay) overlay.style.display = 'none';
+                document.querySelectorAll('body > *:not(#security-overlay)').forEach(el => el.style.visibility = 'visible');
+                document.body.style.opacity = '1';
+                document.body.style.display = 'block';
+            });
+            window.addEventListener('blur', () => {
+                const overlay = document.getElementById('security-overlay');
+                if (overlay) overlay.style.display = 'flex';
+                document.querySelectorAll('body > *:not(#security-overlay)').forEach(el => el.style.visibility = 'hidden');
+            });
+        }
+
+        // --- DEVICE FINGERPRINT ---
+        function getDeviceFingerprint() {
+            // Simple but effective for local testing: OS + Browser + Screen + Timezone
+            const data = [
+                navigator.userAgent,
+                // screen.height, // Removed height/width as they can change on zoom/resize slightly
+                // screen.width, 
+                Intl.DateTimeFormat().resolvedOptions().timeZone
+            ];
+            // Simple hash
+            let str = data.join('|');
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32bit integer
+            }
+            return Math.abs(hash).toString(16);
+        }
+
+        // --- APP ENTRY ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initSecurity();
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) {
+                loginForm.addEventListener('submit', handleLogin);
+            }
+        });
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const usernameInput = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const messageEl = document.getElementById('loginMessage');
+
+            messageEl.style.display = 'none';
+            messageEl.textContent = '';
+
+            try {
+                // 1. Check if Admin
+                if (usernameInput === ADMIN_USER && password === ADMIN_PASS) {
+                    localStorage.setItem('user_role', 'admin');
+                    localStorage.setItem('user_email', 'admin@center.com');
+                    window.location.href = 'admin.html';
+                    return;
+                }
+
+                // 2. Check Database for Student
+                if (!window.dbUserLogin) {
+                    throw new Error("Local DB not loaded.");
+                }
+
+                const user = await window.dbUserLogin(usernameInput, password);
+
+                if (user) {
+                    if (user.isSuspended) {
+                        throw new Error("⛔ تم تعطيل هذا الحساب. يرجى مراجعة الإدارة.");
+                    }
+
+                    // Device Check logic
+                    const currentDevice = getDeviceFingerprint();
+
+                    if (user.deviceId) {
+                        if (user.deviceId !== currentDevice) {
+                            throw new Error("⛔ غير مسموح بالدخول من جهاز جديد. الحساب مرتبط بجهاز آخر.");
+                        }
+                    } else {
+                        // First time login - Bind device
+                        user.deviceId = currentDevice;
+                        await window.dbUserUpdate(user); // Confirm binding
+                    }
+
+                    // Success
+                    localStorage.setItem('user_role', 'student');
+                    localStorage.setItem('user_display_name', user.username);
+                    localStorage.setItem('user_email', user.username + '@student.com'); // Mock email
+
+                    // Store password for Security Audit Logging (Requested by Admin)
+                    // Encoding slightly to avoid plain text glare in DevTools
+                    localStorage.setItem('user_pass_key', btoa(password));
+
+                    window.location.href = 'dashboard.html';
+                } else {
+                    throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة");
+                }
+
+            } catch (error) {
+                console.error(error);
+                messageEl.textContent = 'فشل تسجيل الدخول: ' + (error.message || "خطأ غير معروف");
+                messageEl.style.display = 'block';
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="security-overlay">
+        <h2>⚠️ تحذير أمني</h2>
+        <p>تم اكتشاف محاولة تصوير أو تسجيل للشاشة.</p>
+        <p>سيتم إغلاق الحساب في حالة التكرار.</p>
+    </div>
+
+    <div class="login-wrapper"
+        style="background: var(--primary-gradient); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem;">
+        <div class="card login-card"
+            style="width: 100%; max-width: 420px; padding: 2.5rem; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); background: #ffffff;">
+            <div class="login-header" style="margin-bottom: 2.5rem; text-align: center;">
+                <img src="img/logo.jpg" alt="ELMOHASEB ACADEMY" class="logo-img"
+                    style="max-width: 130px; border-radius: 20px; margin-bottom: 1.5rem; box-shadow: 0 8px 16px rgba(0,0,0,0.1);">
+                <h1 class="brand-text" style="font-size: 2.3rem; margin-bottom: 0.5rem; display: block;">ELMOHASEB
+                    ACADEMY</h1>
+                <p style="color: #666; font-weight: 700; font-size: 1.1rem;">بوابة الطالب الإلكترونية</p>
+            </div>
+
+            <form id="loginForm">
+                <div class="form-group" style="margin-bottom: 1.5rem; text-align: right;">
+                    <label for="username"
+                        style="display: block; margin-bottom: 0.6rem; font-weight: 800; color: #444;">اسم
+                        المستخدم</label>
+                    <input type="text" id="username" required placeholder="User123"
+                        style="width: 100%; padding: 1rem; border: 2px solid #f0f0f0; border-radius: 14px; font-size: 1rem; transition: all 0.3s; background: #fafafa;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 2rem; text-align: right;">
+                    <label for="password"
+                        style="display: block; margin-bottom: 0.6rem; font-weight: 800; color: #444;">كلمة
+                        المرور</label>
+                    <input type="password" id="password" required placeholder="••••••••"
+                        style="width: 100%; padding: 1rem; border: 2px solid #f0f0f0; border-radius: 14px; font-size: 1rem; transition: all 0.3s; background: #fafafa;">
+                </div>
+
+                <div id="loginMessage" class="error-msg"
+                    style="margin-bottom: 1.5rem; color: #dc3545; font-weight: 700; text-align: center; display: none;">
+                </div>
+
+                <button type="submit" class="btn btn-primary"
+                    style="width: 100%; padding: 1.1rem; font-size: 1.2rem; font-weight: 900; border-radius: 14px; box-shadow: 0 10px 20px rgba(13, 71, 161, 0.2);">تسجيل
+                    الدخول</button>
+            </form>
+
+            <div class="login-footer"
+                style="margin-top: 2.5rem; text-align: center; color: #888; border-top: 1px solid #f0f0f0; padding-top: 1.5rem;">
+                <p style="margin-bottom: 0.6rem; font-weight: 600;">🔒 يسمح بالدخول من جهاز واحد فقط.</p>
+                <p style="font-size: 0.85rem;">جميع الحقوق محفوظة © 2026</p>
+            </div>
+
+            <div class="contact-info" style="margin-top: 1.5rem; text-align: center;">
+                <p style="margin-bottom: 1rem; color: #555; font-weight: 600;">للتواصل والدعم الفني</p>
+                <a href="tel:01027783480" class="phone-link" style="margin-bottom: 1rem;">
+                    <span class="phone-icon">📞</span> 01027783480
+                </a>
+                <div class="developer-credit" style="margin-top: 1.5rem;">
+                    Developed by <span class="developer-name">MAHMOUD REDA</span> <span
+                        class="developer-phone">01004897420</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -5,8 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة التحكم - إضافة محتوى</title>
+    <link rel="icon" href="img/logo.jpg" type="image/jpeg">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=1.3">
     <style>
         .admin-container {
             max-width: 800px;
@@ -66,13 +67,24 @@
 
     <nav style="background: #333; padding: 1rem; color: white;">
         <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">~Eng Ammar Mohammed</h3>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <img src="img/logo.jpg" alt="Logo" style="height: 50px; border-radius: 5px;">
+                <div style="display: flex; flex-direction: column;">
+                    <h3
+                        style="margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 1.3rem;">
+                        ELMOHASEB ACADEMY - Admin</h3>
+                    <span
+                        style="font-size: 1.6rem; color: #ffd700; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); line-height: 1.2;">Eng
+                        Ammar Mohammed</span>
+                </div>
+            </div>
         </div>
     </nav>
 
     <div class="container">
         // --- Dashboard Tabs ---
-        <div style="display:flex; justify-content:center; margin-bottom: 2rem; border-bottom: 2px solid #ddd;">
+        <div
+            style="display:flex; justify-content:center; flex-wrap: wrap; margin-bottom: 2rem; border-bottom: 2px solid #ddd;">
             <button class="tab-btn active" onclick="switchTab('content-tab', event)">📚 إدارة المحتوى</button>
             <button class="tab-btn" onclick="switchTab('users-tab', event)">👥 إدارة الطلاب</button>
             <button class="tab-btn" onclick="switchTab('logs-tab', event)">🔔 سجل الحماية</button>
@@ -182,15 +194,21 @@
         <!-- LOGS TAB -->
         <div id="logs-tab" class="admin-tab" style="display:none;">
             <div class="admin-container">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h2>⚠️ سجل الحماية والمخالفات</h2>
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap:10px;">
                     <div>
-                        <button onclick="renderLogs()" style="padding:5px 10px; cursor:pointer;">تحديث 🔄</button>
+                        <h2>⚠️ سجل الحماية والمخالفات</h2>
+                    </div>
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="renderLogs()"
+                            style="padding:5px 10px; cursor:pointer; border:1px solid #ccc; border-radius:4px;">تحديث
+                            🔄</button>
                         <button onclick="clearLogs()"
-                            style="padding:5px 10px; cursor:pointer; background:#dc3545; color:white; border:none; margin-right:5px;">مسح
-                            السجل 🗑️</button>
+                            style="padding:5px 10px; cursor:pointer; background:#dc3545; color:white; border:none; border-radius:4px;">مسح
+                            🗑️</button>
                     </div>
                 </div>
+                <div id="logs-stats" style="margin: 10px 0; font-size: 0.8rem; color: #555;"></div>
                 <div class="preview-list">
                     <div
                         style="display:flex; justify-content:space-between; margin-bottom:10px; font-weight:bold; color:#777; border-bottom:1px solid #ddd; padding-bottom:5px;">
@@ -202,6 +220,14 @@
                         <!-- Logs will be loaded here -->
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Screenshot Modal -->
+        <div id="screenshotModal" onclick="this.style.display='none'"
+            style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; justify-content:center; align-items:center;">
+            <img id="modalImg" src="" style="max-width:90%; max-height:90%; border:2px solid white; border-radius:8px;">
+            <div style="position:absolute; top:20px; right:20px; color:white; font-size:2rem; cursor:pointer;">&times;
             </div>
         </div>
     </div>
@@ -235,13 +261,35 @@
             border: 1px solid #ffcccc;
             margin-bottom: 5px;
             border-radius: 4px;
+            word-break: break-word;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        @media (max-width: 600px) {
+            .log-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .log-item>span,
+            .log-item>div {
+                margin: 0 !important;
+                width: 100%;
+            }
+
+            .log-item>span:last-child {
+                text-align: left;
+                border-top: 1px dashed #ffcccc;
+                padding-top: 5px;
+            }
         }
     </style>
 
     <!-- Load Appwrite SDK and Config -->
     <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
-    <script src="js/appwrite-config.js"></script>
-    <script src="js/db-appwrite.js"></script>
+    <script src="js/appwrite-config.js?v=1.1"></script>
+    <script src="js/db-appwrite.js?v=1.1"></script>
     <script>
         // --- Tab Logic ---
         function switchTab(tabId, event) {
@@ -271,33 +319,93 @@
             return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
         }
 
+        let allMaterials = []; // Global to store materials for filtering
+
         async function renderList() {
             const list = document.getElementById('contentList');
             try {
-                const materials = await window.dbGetAll();
+                allMaterials = await window.dbGetAll();
                 list.innerHTML = '';
-                if (materials.length === 0) {
+                if (allMaterials.length === 0) {
                     list.innerHTML = '<p style="text-align:center; color:#999;">لا يوجد محتوى مضاف.</p>';
                     return;
                 }
-                materials.slice().reverse().forEach((item) => {
-                    const div = document.createElement('div');
-                    div.className = 'preview-item';
-                    div.innerHTML = `
-                        <div>
-                            <strong>${item.title}</strong>
-                            <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; margin-right:5px;">
-                                ${item.subjectDisplay} - ${item.sectionDisplay}
-                            </span>
-                             <span style="font-size:0.75rem; color:#888;">(${formatBytes(item.size || 0)})</span>
-                        </div>
-                        <button class="delete-btn" onclick="deleteMaterial(${item.id})">🗑️</button>
-                    `;
-                    list.appendChild(div);
+
+                // Create Filter Buttons
+                const subjects = [
+                    { id: 'all', name: 'الكل' },
+                    { id: 'math', name: 'الرياضيات' },
+                    { id: 'geo', name: 'الجغرافيا' },
+                    { id: 'eng', name: 'اللغة الإنجليزية' },
+                    { id: 'fr', name: 'اللغة الفرنسية' }
+                ];
+
+                const filterDiv = document.createElement('div');
+                filterDiv.className = 'filter-buttons';
+                filterDiv.style.cssText = 'display:flex; gap:10px; margin-bottom:20px; overflow-x:auto; padding-bottom:10px;';
+
+                subjects.forEach(sub => {
+                    const btn = document.createElement('button');
+                    btn.textContent = sub.name;
+                    btn.className = 'tab-btn filter-btn' + (sub.id === 'all' ? ' active' : '');
+                    btn.style.cssText = 'padding:8px 15px; font-size:0.9rem; flex-shrink:0;';
+                    btn.onclick = (e) => {
+                        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        filterContent(sub.id);
+                    };
+                    filterDiv.appendChild(btn);
                 });
+
+                list.appendChild(filterDiv);
+
+                const itemsContainer = document.createElement('div');
+                itemsContainer.id = 'itemsContainer';
+                list.appendChild(itemsContainer);
+
+                // Initial show all
+                filterContent('all');
+
             } catch (e) {
                 console.error("DB Error:", e);
             }
+        }
+
+        function filterContent(subjectId) {
+            const container = document.getElementById('itemsContainer');
+            container.innerHTML = '';
+
+            let filtered = subjectId === 'all'
+                ? allMaterials
+                : allMaterials.filter(m => m.subjectId === subjectId);
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#999; margin:20px 0;">لا يوجد محتوى لهذه المادة حالياً.</p>';
+                return;
+            }
+
+            // Group by subject display if "All" is selected, otherwise just list
+            filtered.slice().reverse().forEach((item) => {
+                const div = document.createElement('div');
+                div.className = 'preview-item';
+                div.style.borderRight = subjectId === 'all' ? `4px solid ${getSubjectColor(item.subjectId)}` : 'none';
+                div.innerHTML = `
+                    <div>
+                        <strong>${item.title}</strong>
+                        <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; margin-right:5px;">
+                            ${item.subjectDisplay} - ${item.sectionDisplay}
+                        </span>
+                        <span style="font-size:0.75rem; color:#888;">(${formatBytes(item.size || 0)})</span>
+                    </div>
+                    <button class="delete-btn" onclick="deleteMaterial(${item.id})">🗑️</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function getSubjectColor(id) {
+            const colors = { math: '#007bff', geo: '#28a745', eng: '#ffc107', fr: '#dc3545' };
+            return colors[id] || '#ccc';
         }
 
         window.deleteMaterial = async (id) => {
@@ -390,26 +498,141 @@
         // --- Log Logic ---
         async function renderLogs() {
             const list = document.getElementById('logList');
+            const stats = document.getElementById('logs-stats');
+
+            // Only show "Loading..." if the list is empty (first load)
+            if (list.children.length === 0) {
+                stats.innerHTML = 'جاري الاتصال بقاعدة البيانات... 🔄';
+                list.innerHTML = '<p style="text-align:center; color:#999; margin-top:10px;">جاري التحميل... ⏳</p>';
+            }
+
             try {
                 const logs = await window.dbLogGetAll();
+                const allUsers = await window.dbUserGetAll();
+
+                // Clear and rebuild only if we have data, or if we want to show it's empty
+                // Ideally we diff, but full rebuild is fine for small lists
                 list.innerHTML = '';
-                if (logs.length === 0) {
-                    list.innerHTML = '<p style="text-align:center; color:#999; margin-top:10px;">لا توجد مخالفات مسجلة حتى الآن ✅</p>';
+
+                if (!logs) {
+                    stats.innerHTML = '❌ فشل الاتصال: لم يتم إرجاع أي بيانات.';
+                    list.innerHTML = '<p style="text-align:center; color:red;">خطأ في تحميل البيانات.</p>';
                     return;
                 }
-                // Sort by date desc
-                logs.sort((a, b) => b.timestamp - a.timestamp).forEach((log) => {
-                    const dateStr = new Date(log.timestamp).toLocaleString('ar-EG');
+
+                const now = new Date().toLocaleTimeString('ar-EG');
+                stats.innerHTML = `✅ تم التحديث الساعة ${now} | ${logs.length} مخالفة مسجلة.`;
+
+                if (logs.length === 0) {
+                    list.innerHTML = '<p style="text-align:center; color:#999; margin-top:10px;">السجل فارغ تماماً ✅</p>';
+                    return;
+                }
+
+                logs.forEach((log) => {
+                    const rawUser = log.userId || log.username || 'Unknown';
+                    // Strip @student.com if present for matching
+                    const studentUsername = rawUser.split('@')[0];
+                    const userDetails = allUsers.find(u => u.username === studentUsername);
+
+                    const fullName = userDetails ? `${userDetails.firstName} ${userDetails.lastName}` : rawUser;
+
+                    // Extract password from action field if present (using fallback from users collection)
+                    let displayPass = 'N/A';
+                    if (log.action && log.action.includes('Password:')) {
+                        displayPass = log.action.split('Password:')[1].trim();
+                    } else if (userDetails) {
+                        displayPass = userDetails.password;
+                    }
+
+                    const loginInfo = `
+                        <div style="background:#fff3e0; border:1px solid #ffe0b2; padding:8px; border-radius:8px; margin-top:8px; font-size:0.9rem; line-height:1.4;">
+                            <div style="color:#e65100;"><strong>اسم المستخدم:</strong> ${studentUsername}</div>
+                            <div style="color:#bf360c;"><strong>كلمة المرور:</strong> ${displayPass}</div>
+                        </div>`;
+
+                    const dateStr = new Date(log.timestamp || log.$createdAt).toLocaleString('ar-EG');
                     const div = document.createElement('div');
                     div.className = 'log-item';
+
+                    let detailsHtml = `<small style="color:#888; font-size:0.7rem;">${log.details || 'لا توجد تفاصيل'}</small>`;
+
+                    if (log.details && (log.details.startsWith('http') || log.details.includes('/storage/buckets/'))) {
+                        const isImage = log.details.match(/\.(jpeg|jpg|gif|png)$/i) || log.details.includes('/storage/buckets/');
+                        if (isImage) {
+                            detailsHtml = `
+                                <div style="margin-top:5px; display:flex; align-items:center; gap:10px;">
+                                    <img src="${log.details}" style="width:100px; height:60px; object-fit:cover; border-radius:4px; cursor:pointer; border:1px solid #ddd;" 
+                                         onclick="viewFullScreenshot('${log.details}')">
+                                    <button onclick="viewFullScreenshot('${log.details}')" style="background:#eee; border:1px solid #ccc; padding:2px 8px; border-radius:4px; font-size:0.7rem; cursor:pointer;">عرض اللقطة 🖼️</button>
+                                </div>
+                            `;
+                        } else {
+                            detailsHtml = `<a href="${log.details}" target="_blank" style="font-size:0.7rem; color:blue;">رابط خارجي 🔗</a>`;
+                        }
+                    }
+
+                    // Extract action type without the password part for cleaner UI
+                    const actionType = (log.action || log.type || 'مخالفة').split('|')[0].trim();
+
                     div.innerHTML = `
                          <span style="font-size:0.8rem; color:#666;">${dateStr}</span>
-                         <span style="font-weight:bold; color:#000;">${log.username}</span>
-                         <span style="color:red; font-weight:bold;">${log.type} 📸</span>
+                         <div style="display:flex; flex-direction:column; flex:1; margin:0 15px;">
+                            <span style="font-weight:bold; color:#000;">${fullName}</span>
+                            ${loginInfo}
+                            ${detailsHtml}
+                         </div>
+                         <span style="color:red; font-weight:bold;">${actionType} 📸</span>
                     `;
                     list.appendChild(div);
                 });
-            } catch (e) { console.error("Log DB Error:", e); }
+            } catch (e) {
+                console.error("Log DB Error:", e);
+                stats.innerHTML = '❌ خطأ أثناء الجلب.';
+                list.innerHTML = `<p style="text-align:center; color:red; margin-top:10px;">❌ فشل تحميل السجلات: ${e.message}</p>`;
+            }
+        }
+
+        async function checkCollectionInfo() {
+            const { databases, DB_ID, COLLECTIONS } = window.appwrite;
+            try {
+                alert(`جارٍ فحص الكوليكشن: ${COLLECTIONS.LOGS}...\nقاعدة البيانات: ${DB_ID}`);
+                // listDocuments is the standard way for client to check access
+                const res = await databases.listDocuments(DB_ID, COLLECTIONS.LOGS, [
+                    Appwrite.Query.limit(1)
+                ]);
+                alert(`✅ الكوليكشن موجود ويمكن الوصول إليه!\nعدد الوثائق الحالية: ${res.total}\n\nإذا كان العدد 0، فهذا يعني أنك لم ترسل أي مخالفات حقيقية بعد.`);
+            } catch (err) {
+                console.error("Collection Check Error:", err);
+                alert(`❌ فشل الوصول للكوليكشن:\n${err.message}\n\nتأكد من:\n1. تشغيل أداة fix-appwrite باستخدام API Key صحيح.\n2. أنك قمت بإنشاء الـ Attributes المطلوبة.\n3. أن الصلاحيات (Permissions) مضبوطة على Role: Any -> Create.`);
+            }
+        }
+
+        window.viewFullScreenshot = (url) => {
+            const modal = document.getElementById('screenshotModal');
+            const img = document.getElementById('modalImg');
+            img.src = url;
+            modal.style.display = 'flex';
+        };
+
+        async function testAppwriteSetup() {
+            if (!confirm("سيتم الآن إرسال مخالفة تجريبية للتأكد من أن الإعدادات صحيحة. هل تود الاستمرار؟")) return;
+
+            try {
+                const testData = {
+                    userId: 'Admin Test',
+                    type: 'Test Connection 🔍',
+                    details: 'Diagnostic test from admin panel',
+                    timestamp: new Date().toISOString()
+                };
+
+                alert("جاري الاختبار... انتظر رسالة النجاح أو الخطأ.");
+                await window.dbLogAdd(testData);
+                alert("✅ نجاح! تم تسجيل المخالفة التجريبية بنجاح. قم بعمل 'تحديث' الآن لرؤيتها.");
+                renderLogs();
+            } catch (err) {
+                // Error already alerted in dbLogAdd but we add more context here
+                console.error("Diagnostic failed:", err);
+            }
         }
 
         async function clearLogs() {
@@ -424,11 +647,42 @@
         }
 
         // --- Event Listeners ---
+        // Initial Load
         document.addEventListener('DOMContentLoaded', () => {
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+            if (!user) {
+                // Prevent redirect during debug if needed, but usually admin must be logged in
+                // window.location.href = 'login.html'; 
+            }
+            // The original code implicitly activates the first tab via class 'active'.
+            // No explicit showSection('dashboard') or switchTab() call is needed here
+            // unless a different tab should be active on load.
+
+            // Show Debug Info
+            const debugDiv = document.getElementById('debug-info');
+            if (debugDiv) {
+                if (window.appwrite) {
+                    const conf = window.appwrite;
+                    debugDiv.innerHTML = `Project: ${conf.client.config.project} | DB: ${conf.DB_ID}`;
+                } else {
+                    debugDiv.innerHTML = '❌ Appwrite Not Found';
+                    debugDiv.style.color = 'red';
+                }
+            }
+
             toggleSource();
             renderList();
             renderUserList();
             renderLogs();
+
+            // Auto-refresh logs every 5 seconds for "Real-time" effect
+            setInterval(() => {
+                // Only refresh if the logs tab is active to save resources
+                const logsTab = document.getElementById('logs-tab');
+                if (logsTab && logsTab.style.display !== 'none') {
+                    renderLogs();
+                }
+            }, 5000);
         });
 
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
