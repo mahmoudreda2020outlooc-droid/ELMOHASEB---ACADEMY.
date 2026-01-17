@@ -512,12 +512,20 @@
         // --- PWA Logic ---
         let deferredPrompt;
         const installBanner = document.getElementById('install-banner');
+        const headerInstallBtn = document.getElementById('header-install-btn');
+
+        // Show button by default if not already installed (standalone)
+        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+            if (headerInstallBtn) headerInstallBtn.style.display = 'none';
+        } else {
+            if (headerInstallBtn) headerInstallBtn.style.display = 'flex';
+        }
 
         // Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js')
-                    .then(reg => console.log('SW Registered', reg))
+                    .then(reg => console.log('SW Registered'))
                     .catch(err => console.log('SW Failed', err));
             });
         }
@@ -527,39 +535,39 @@
             e.preventDefault();
             deferredPrompt = e;
 
-            // Show header button
-            const headerInstallBtn = document.getElementById('header-install-btn');
+            // Ensure button is visible
             if (headerInstallBtn) headerInstallBtn.style.display = 'flex';
 
-            // Only show if not already dismissed in this session
             if (!sessionStorage.getItem('installDismissed')) {
                 setTimeout(() => {
-                    installBanner.style.display = 'flex';
-                }, 3000); // Show after 3 seconds
+                    if (installBanner) installBanner.style.display = 'flex';
+                }, 3000);
             }
         });
 
         function installApp() {
-            if (!deferredPrompt) return;
-            installBanner.style.display = 'none';
-            const headerInstallBtn = document.getElementById('header-install-btn');
-            if (headerInstallBtn) headerInstallBtn.style.display = 'none';
-
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then((choiceResult) => {
-                if (choiceResult.outcome === 'accepted') {
-                    console.log('User accepted the install prompt');
-                } else {
-                    console.log('User dismissed the install prompt');
-                }
-                deferredPrompt = null;
-            });
+            if (deferredPrompt) {
+                if (installBanner) installBanner.style.display = 'none';
+                if (headerInstallBtn) headerInstallBtn.style.display = 'none';
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                });
+            } else {
+                // Fallback for devices like iOS
+                alert("لتثبيت التطبيق:\n1. اضغط على زر المشاركة (Share) في المتصفح.\n2. اختر 'إضافة إلى الشاشة الرئيسية' (Add to Home Screen).");
+            }
         }
 
         function closeInstallBanner() {
-            installBanner.style.display = 'none';
+            if (installBanner) installBanner.style.display = 'none';
             sessionStorage.setItem('installDismissed', 'true');
         }
+
+        window.addEventListener('appinstalled', () => {
+            if (headerInstallBtn) headerInstallBtn.style.display = 'none';
+            if (installBanner) installBanner.style.display = 'none';
+        });
     </script>
 
     <!-- Install App Banner -->
