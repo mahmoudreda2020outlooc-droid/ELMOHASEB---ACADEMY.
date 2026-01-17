@@ -282,6 +282,61 @@
                 font-size: 1.6rem;
             }
         }
+
+        @keyframes slideInDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Developer Credits Styling for Index */
+        .developer-credit {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            font-size: 0.9rem;
+            color: #888;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            display: inline-block;
+            width: 100%;
+            direction: ltr;
+            transition: transform 0.3s ease;
+        }
+
+        .developer-name {
+            background: linear-gradient(90deg, #0d47a1, #b8860b, #0d47a1);
+            background-size: 200% auto;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 900;
+            text-transform: uppercase;
+            margin: 0 5px;
+            font-size: 1.2rem;
+            animation: textShine 3s linear infinite;
+        }
+
+        .developer-phone {
+            color: #0d47a1;
+            font-family: inherit;
+            font-weight: 900;
+            margin-left: 8px;
+            display: inline-block;
+            font-size: 1.1rem;
+        }
+
+        @keyframes textShine {
+            to {
+                background-position: 200% center;
+            }
+        }
     </style>
 </head>
 
@@ -335,9 +390,8 @@
     <footer class="main-footer">
         <p class="copyright">© ELMOHASEB ACADEMY 2026. جميع الحقوق محفوظة.</p>
         <div class="developer-credit" dir="ltr">
-            <span class="dev-label">Developed by</span>
-            <span class="dev-name">MAHMOUD REDA</span>
-            <span class="dev-phone">01004897420</span>
+            BY <span class="developer-name">MAHMOUD REDA</span>
+            <span class="developer-phone">01004897420</span>
         </div>
     </footer>
 
