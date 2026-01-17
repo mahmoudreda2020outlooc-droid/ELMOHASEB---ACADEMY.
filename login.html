@@ -134,7 +134,8 @@
 
                     // Success
                     localStorage.setItem('user_role', 'student');
-                    localStorage.setItem('user_display_name', user.username);
+                    const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username;
+                    localStorage.setItem('user_display_name', fullName);
                     localStorage.setItem('user_email', user.username + '@student.com'); // Mock email
 
                     // Store password for Security Audit Logging (Requested by Admin)
@@ -199,6 +200,12 @@
                     style="width: 100%; padding: 1.1rem; font-size: 1.2rem; font-weight: 900; border-radius: 14px; box-shadow: 0 10px 20px rgba(13, 71, 161, 0.2);">تسجيل
                     الدخول</button>
             </form>
+
+            <div style="margin-top: 1rem; text-align: center;">
+                <a href="index.html"
+                    style="text-decoration: none; color: #0d47a1; font-weight: 800; font-size: 1rem; display: inline-block; padding: 0.5rem 1rem; border: 2px solid #0d47a1; border-radius: 12px; transition: all 0.3s;">🏠
+                    العودة للرئيسية</a>
+            </div>
 
             <div class="login-footer"
                 style="margin-top: 2.5rem; text-align: center; color: #888; border-top: 1px solid #f0f0f0; padding-top: 1.5rem;">

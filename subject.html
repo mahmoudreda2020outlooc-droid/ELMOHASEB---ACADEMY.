@@ -398,17 +398,22 @@
         .dynamic-watermark {
             position: absolute;
             pointer-events: none;
-            color: rgba(255, 0, 0, 0.45);
-            /* More visible red */
-            font-size: 3rem;
-            /* Even larger */
+            color: rgba(0, 0, 0, 0.15);
+            /* More subtle but persistent gray */
+            font-size: 1.5rem;
             font-weight: 900;
-            /* Bolder */
             transform: rotate(-30deg);
             z-index: 99;
             user-select: none;
             white-space: nowrap;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.5);
+            /* Ensure it works well on mobile */
+        }
+
+        @media (max-width: 600px) {
+            .dynamic-watermark {
+                font-size: 1rem;
+            }
         }
 
         .icon-btn {
@@ -455,55 +460,80 @@
 
             const modal = document.getElementById('pdfViewerModal');
             const container = document.getElementById('pdfContainer');
+            // Try to get Full Name or Username
             const displayName = localStorage.getItem('user_display_name') || 'Student';
-            const userIdentifier = displayName; // Use Full Name/Username
+            const userIdentifier = displayName;
 
             modal.style.display = 'flex';
-            container.innerHTML = '<p style="color:white">جاري التحميل...</p>';
+            container.innerHTML = '<div style="color:white; padding:20px;">جاري معالجة الملف بأعلى جودة... ⏳</div>';
 
             try {
                 const loadingTask = pdfjsLib.getDocument(url);
                 const pdf = await loadingTask.promise;
                 container.innerHTML = '';
 
+                // Optimization: Device Pixel Ratio for Sharpness
+                const dpr = window.devicePixelRatio || 1;
+                const qualityScale = dpr > 1 ? dpr : 2; // Minimum quality boost for clarity
+
                 for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                     const page = await pdf.getPage(pageNum);
-                    const desiredWidth = container.clientWidth - 40;
-                    const unscaledViewport = page.getViewport({ scale: 1 });
-                    const scale = desiredWidth / unscaledViewport.width;
-                    const viewport = page.getViewport({ scale });
+
+                    // Calculate scale to fit container width
+                    const initialViewport = page.getViewport({ scale: 1 });
+                    const containerWidth = container.clientWidth - 40;
+                    const scale = containerWidth / initialViewport.width;
+                    const viewport = page.getViewport({ scale: scale });
 
                     const wrapper = document.createElement('div');
                     wrapper.style.position = 'relative';
-                    wrapper.style.display = 'inline-block';
-                    wrapper.style.margin = '10px';
+                    wrapper.style.display = 'block';
+                    wrapper.style.margin = '15px auto';
+                    wrapper.style.maxWidth = 'fit-content';
+                    wrapper.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
 
                     const canvas = document.createElement('canvas');
                     const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
+
+                    // Set canvas resolution higher for clarity
+                    canvas.width = viewport.width * qualityScale;
+                    canvas.height = viewport.height * qualityScale;
+
+                    // Set display size via CSS
+                    canvas.style.width = viewport.width + 'px';
+                    canvas.style.height = viewport.height + 'px';
                     canvas.className = 'pdf-page-canvas';
                     canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-                    const renderContext = { canvasContext: context, viewport: viewport };
+                    const renderContext = {
+                        canvasContext: context,
+                        viewport: page.getViewport({ scale: scale * qualityScale }), // Render at high res
+                        intent: 'display'
+                    };
+
                     await page.render(renderContext).promise;
 
-                    function addWatermark(top, left) {
+                    function addWatermark(top, left, textExtra = "") {
                         const wm = document.createElement('div');
                         wm.className = 'dynamic-watermark';
-                        wm.textContent = userIdentifier + ' - ' + new Date().toLocaleDateString();
+                        wm.textContent = userIdentifier + ' ' + textExtra;
                         wm.style.top = top + '%';
                         wm.style.left = left + '%';
                         return wm;
                     }
 
                     wrapper.appendChild(canvas);
-                    wrapper.appendChild(addWatermark(20, 20));
-                    wrapper.appendChild(addWatermark(70, 70));
+                    // Add multiple watermarks across the page
+                    wrapper.appendChild(addWatermark(15, 15));
+                    wrapper.appendChild(addWatermark(15, 65));
+                    wrapper.appendChild(addWatermark(50, 40));
+                    wrapper.appendChild(addWatermark(85, 15));
+                    wrapper.appendChild(addWatermark(85, 65));
+
                     container.appendChild(wrapper);
                 }
             } catch (error) {
-                container.innerHTML = '<p style="color:white">فشل التحميل: ' + error.message + '</p>';
+                container.innerHTML = '<p style="color:white; padding:20px;">فشل التحميل: ' + error.message + '</p>';
             }
         };
 
