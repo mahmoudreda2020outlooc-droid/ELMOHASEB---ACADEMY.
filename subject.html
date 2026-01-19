@@ -448,8 +448,70 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-30deg);
-            z-index: 99;
+            z-index: 10000;
             user-select: none;
+        }
+
+        /* --- Exam Review Styles --- */
+        .review-q-item {
+            text-align: right;
+            border-bottom: 2px solid #eee;
+            padding: 1.5rem 0;
+            margin-bottom: 1rem;
+        }
+
+        .review-q-text {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .review-choices {
+            display: grid;
+            gap: 8px;
+        }
+
+        .review-choice {
+            padding: 10px 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .review-choice.correct {
+            background: #e8f5e9;
+            border-color: #4caf50;
+            color: #2e7d32;
+            font-weight: bold;
+        }
+
+        .review-choice.incorrect {
+            background: #ffebee;
+            border-color: #ef5350;
+            color: #c62828;
+            text-decoration: line-through;
+        }
+
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-right: auto;
+        }
+
+        .status-badge.correct {
+            background: #4caf50;
+            color: white;
+        }
+
+        .status-badge.incorrect {
+            background: #ef5350;
+            color: white;
         }
 
         @media (max-width: 600px) {
@@ -760,9 +822,33 @@
         window.finishExam = async () => {
             clearInterval(timerInterval);
             let score = 0;
-            currentExam.questions.forEach((q, i) => {
-                if (userAnswers[i] === q.correctAnswer) score++;
-            });
+
+            const reviewHtml = currentExam.questions.map((q, i) => {
+                const isCorrect = userAnswers[i] === q.correctAnswer;
+                if (isCorrect) score++;
+
+                const choicesHtml = q.choices.map((c, cIdx) => {
+                    let className = 'review-choice';
+                    let badge = '';
+                    if (cIdx === q.correctAnswer) {
+                        className += ' correct';
+                        badge = '<span class="status-badge correct">الإجابة الصحيحة ✅</span>';
+                    } else if (cIdx === userAnswers[i]) {
+                        className += ' incorrect';
+                        badge = '<span class="status-badge incorrect">إجابتك ❌</span>';
+                    }
+                    return `<div class="${className}">${c} ${badge}</div>`;
+                }).join('');
+
+                return `
+                    <div class="review-q-item">
+                        <div class="review-q-text">${i + 1}. ${q.text}</div>
+                        <div class="review-choices">
+                            ${choicesHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
 
             const percent = Math.round((score / currentExam.questions.length) * 100);
             const userId = localStorage.getItem('user_id');
@@ -776,11 +862,15 @@
 
             const container = document.getElementById('questionContainer');
             container.innerHTML = `
-                <div style="text-align:center; padding:2rem;">
+                <div style="text-align:center; padding:1rem; border-bottom: 2px solid #0d47a1; margin-bottom: 2rem;">
                     <div style="font-size:3rem;">${percent >= 50 ? '🎉' : '😕'}</div>
                     <h2>نتيجتك: ${score} من ${currentExam.questions.length}</h2>
                     <p style="font-size:1.5rem; color:${percent >= 50 ? 'green' : 'red'}; font-weight:bold;">${percent}%</p>
-                    <button class="action-btn" style="margin-top:20px;" onclick="location.reload()">إغلاق وإنهاء</button>
+                    <button class="action-btn" style="margin-top:10px;" onclick="location.reload()">إغلاق وإنهاء</button>
+                </div>
+                <div style="max-height: 50vh; overflow-y: auto; padding-right: 10px;">
+                    <h3 style="text-align:right; color:#0d47a1; margin-bottom:1rem;">مراجعة الإجابات:</h3>
+                    ${reviewHtml}
                 </div>
             `;
 
