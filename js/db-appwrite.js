@@ -144,7 +144,7 @@ window.dbUserLogin = async (username, password) => {
 };
 
 window.dbUserGetAll = async () => {
-    const { databases, DB_ID, COLLECTIONS } = getAppwrite();
+    const { databases, DB_ID, COLLECTIONS, Query } = getAppwrite();
     try {
         if (!databases) throw new Error("Appwrite not initialized");
         const response = await databases.listDocuments(DB_ID, COLLECTIONS.USERS, [
@@ -154,6 +154,23 @@ window.dbUserGetAll = async () => {
     } catch (e) {
         console.error("User GetAll Error:", e);
         return [];
+    }
+};
+
+window.dbUserGet = async (id) => {
+    const { databases, DB_ID, COLLECTIONS } = getAppwrite();
+    try {
+        if (!databases) throw new Error("Appwrite not initialized");
+        const docId = String(id);
+        const user = await databases.getDocument(DB_ID, COLLECTIONS.USERS, docId);
+        return {
+            ...user,
+            id: user.id || user.$id,
+            role: user.role || 'student'
+        };
+    } catch (e) {
+        console.error("User Get Error:", e);
+        return null;
     }
 };
 
@@ -194,6 +211,7 @@ window.dbUserAdd = async (user) => {
             isActive: true, // Schema requires this
             deviceId: user.deviceId || null,
             avatar: user.avatar || null,
+            permittedSubjects: user.permittedSubjects || "math,geo,eng,fr", // Default to all if not specified
             role: user.role || 'student'
         };
         await databases.createDocument(DB_ID, COLLECTIONS.USERS, docId, data);
@@ -204,6 +222,9 @@ window.dbUserAdd = async (user) => {
         const errorCode = e.code || "";
         if (errorCode === 409) errorMsg = "اسم المستخدم موجود بالفعل!";
         else if (errorCode === 401 || errorCode === 403) errorMsg = "مشكلة في الأذونات (Permissions) لكوليكشن Users.";
+        else if (errorMsg.includes("Attribute not found") || errorMsg.includes("Unknown attribute")) {
+            errorMsg = "❌ الحقل 'permittedSubjects' غير موجود في قاعدة البيانات. يرجى فتح ملف fix-appwrite.html وتشغيله أولاً لتحديث قاعدة البيانات.";
+        }
 
         alert("خطأ في إنشاء مستخدم (Code " + errorCode + "): " + errorMsg);
         throw e;

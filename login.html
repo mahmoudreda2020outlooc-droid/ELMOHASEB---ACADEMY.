@@ -243,8 +243,10 @@
                     // Success
                     localStorage.setItem('user_role', 'student');
                     const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username;
+                    localStorage.setItem('user_id', user.id || user.$id);
                     localStorage.setItem('user_display_name', fullName);
                     localStorage.setItem('user_email', user.username + '@student.com'); // Mock email
+                    localStorage.setItem('user_permitted_subjects', user.permittedSubjects || "math,geo,eng,fr");
 
                     // Store password for Security Audit Logging (Requested by Admin)
                     // Encoding slightly to avoid plain text glare in DevTools

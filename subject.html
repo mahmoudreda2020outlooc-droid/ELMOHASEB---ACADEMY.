@@ -126,25 +126,43 @@
             const subjectId = getQueryParam('id');
             const subjectData = subjects[subjectId];
 
+            // --- Permission Check ---
+            const permittedStr = localStorage.getItem('user_permitted_subjects') || "";
+            const permitted = permittedStr.split(',').filter(s => s);
+
+            if (!permitted.includes(subjectId)) {
+                alert("⛔ غير مسموح لك بدخول هذه المادة. يرجى التواصل مع الإدارة.");
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
             if (subjectData) {
                 document.getElementById('subjectTitle').textContent = subjectData.name;
                 document.getElementById('subjectIcon').textContent = subjectData.icon;
                 renderDynamicMaterials(subjectId);
+                renderOnlineExams(subjectId);
             } else {
                 document.body.innerHTML = '<h1 style="text-align:center; margin-top:50px;">مادة غير موجودة</h1>';
             }
 
             document.getElementById('logoutBtn').addEventListener('click', () => {
                 localStorage.removeItem('user_email');
+                localStorage.removeItem('user_display_name');
+                localStorage.removeItem('user_role');
+                localStorage.removeItem('is_master_admin');
+                localStorage.removeItem('user_permitted_subjects');
                 window.location.href = 'login.html';
             });
 
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.addEventListener('click', () => {
+                    const target = tab.dataset.target;
                     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                     document.querySelectorAll('.content-section').forEach(c => c.classList.remove('active'));
                     tab.classList.add('active');
-                    document.getElementById(tab.dataset.target).classList.add('active');
+                    document.getElementById(target).classList.add('active');
+
+                    if (target === 'online_exams') renderOnlineExams(subjectId);
                 });
             });
         });
@@ -303,8 +321,9 @@
         <div class="tabs">
             <div class="tab active" data-target="videos">🎥 المحاضرات</div>
             <div class="tab" data-target="pdfs">📚 الملازم (PDF)</div>
+            <div class="tab" data-target="exams">📝 امتحانات سابقة</div>
+            <div class="tab" data-target="online_exams">📝 امتحانات إلكترونية</div>
             <div class="tab" data-target="sheets">📝 الشيتات</div>
-            <div class="tab" data-target="exams">🏆 الامتحانات السابقة</div>
         </div>
     </div>
 
@@ -313,6 +332,7 @@
         <div id="pdfs" class="content-section"></div>
         <div id="sheets" class="content-section"></div>
         <div id="exams" class="content-section"></div>
+        <div id="online_exams" class="content-section"></div>
     </div>
 
     <!-- Secure PDF Viewer Modal -->
@@ -347,6 +367,28 @@
                 <iframe id="youtubePlayer" style="width: 100%; height: 80vh; display: none;" frameborder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Online Exam Player Modal -->
+    <div id="examPlayerModal" class="secure-modal" style="display:none;">
+        <div class="modal-content" style="max-width:800px; height:auto; max-height:90vh;">
+            <div class="modal-header">
+                <h3 id="playerExamTitle">الامتحان الإلكتروني</h3>
+                <div id="examTimer" style="font-weight:bold; color:red; font-size:1.2rem;">00:00</div>
+            </div>
+            <div class="modal-body" style="padding:2rem;">
+                <div id="questionContainer">
+                    <!-- Questions will be rendered here -->
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:20px;">
+                    <button class="action-btn" id="prevQBtn" onclick="changeQuestion(-1)"
+                        style="background:#888;">السابق</button>
+                    <button class="action-btn" id="nextQBtn" onclick="changeQuestion(1)">التالي</button>
+                    <button class="action-btn" id="submitExamBtn" onclick="finishExam()"
+                        style="background:#28a745; display:none;">إنهاء الامتحان</button>
+                </div>
             </div>
         </div>
     </div>
@@ -398,16 +440,16 @@
         .dynamic-watermark {
             position: absolute;
             pointer-events: none;
-            color: rgba(0, 0, 0, 0.15);
-            /* More subtle but persistent gray */
-            font-size: 1.5rem;
-            font-weight: 900;
-            transform: rotate(-30deg);
+            opacity: 0.1;
+            /* Very subtle for a large center logo */
+            width: 70%;
+            /* Large logo */
+            height: auto;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
             z-index: 99;
             user-select: none;
-            white-space: nowrap;
-            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.5);
-            /* Ensure it works well on mobile */
         }
 
         @media (max-width: 600px) {
@@ -513,22 +555,16 @@
 
                     await page.render(renderContext).promise;
 
-                    function addWatermark(top, left, textExtra = "") {
-                        const wm = document.createElement('div');
-                        wm.className = 'dynamic-watermark';
-                        wm.textContent = userIdentifier + ' ' + textExtra;
-                        wm.style.top = top + '%';
-                        wm.style.left = left + '%';
-                        return wm;
+                    function addCenteredWatermark() {
+                        const img = document.createElement('img');
+                        img.src = 'img/logo.jpg';
+                        img.className = 'dynamic-watermark';
+                        return img;
                     }
 
                     wrapper.appendChild(canvas);
-                    // Add multiple watermarks across the page
-                    wrapper.appendChild(addWatermark(15, 15));
-                    wrapper.appendChild(addWatermark(15, 65));
-                    wrapper.appendChild(addWatermark(50, 40));
-                    wrapper.appendChild(addWatermark(85, 15));
-                    wrapper.appendChild(addWatermark(85, 65));
+                    // Add single centered logo watermark
+                    wrapper.appendChild(addCenteredWatermark());
 
                     container.appendChild(wrapper);
                 }
@@ -572,6 +608,186 @@
                 iframe.style.display = 'none';
                 video.play();
             }
+        };
+    </script>
+    <script src="js/exams-builder.js?v=1.1"></script>
+    <script>
+        // --- Online Exams Student Logic ---
+        let currentExam = null;
+        let userAnswers = [];
+        let currentQIndex = 0;
+        let timerInterval = null;
+
+        async function renderOnlineExams(subjectId) {
+            const container = document.getElementById('online_exams');
+            container.innerHTML = 'جاري تحميل الامتحانات...';
+
+            try {
+                const exams = await window.ExamsBuilder.getAllExams(subjectId);
+                container.innerHTML = '';
+
+                if (exams.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; color:#777; margin-top:2rem;">لا توجد امتحانات إلكترونية لهذه المادة حالياً.</p>';
+                    return;
+                }
+
+                const now = new Date();
+                const userId = localStorage.getItem('user_id');
+
+                for (const exam of exams) {
+                    const isOpen = exam.isOpen === true;
+
+                    // Check for expiry (Skip ONLY if not Open Mode)
+                    if (!isOpen && exam.expiryDate) {
+                        const expiry = new Date(exam.expiryDate);
+                        if (now > expiry) continue; // Skip expired exams
+                    }
+
+                    // Check for previous attempt (Fail-safe)
+                    let attempt = null;
+                    try {
+                        if (userId) {
+                            attempt = await window.ExamsBuilder.checkExamAttempt(userId, exam.$id);
+                        }
+                    } catch (attErr) {
+                        console.warn("Could not check attempt status:", attErr);
+                    }
+                    const isTaken = attempt !== null;
+                    // Bypass block if Open Mode
+                    const canEnter = !isTaken || isOpen;
+
+                    const div = document.createElement('div');
+                    div.className = 'material-item';
+                    div.style.opacity = (isTaken && !isOpen) ? '0.7' : '1';
+
+                    div.innerHTML = `
+                        <div class="material-info">
+                            <div class="material-icon">${isTaken ? '✅' : '📝'}</div>
+                            <div>
+                                <h3>${exam.title} ${isOpen ? '🔓' : ''}</h3>
+                                <p style="color:#666; font-size:0.9rem;">
+                                    ${exam.questions.length} سؤال - مدة ${exam.timeLimit} دقيقة
+                                    ${isTaken ? `<br><b style="color:#2e7d32;">آخر درجة: ${attempt.score}/${attempt.total}</b>` : ''}
+                                </p>
+                            </div>
+                        </div>
+                        ${canEnter ?
+                            `<button class="action-btn" onclick='startExam(${JSON.stringify(exam).replace(/'/g, "&apos;")})'>${isTaken ? 'دخول مرة أخرى' : 'ابدأ الامتحان'}</button>` :
+                            `<button class="action-btn" disabled style="background:#ccc;">تم الدخول مسبقاً</button>`
+                        }
+                    `;
+                    container.appendChild(div);
+                }
+            } catch (e) {
+                container.innerHTML = 'فشل التحميل.';
+            }
+        }
+
+        window.startExam = async (exam) => {
+            const userId = localStorage.getItem('user_id');
+
+            // Immediately mark as started to prevent re-entry
+            try {
+                await window.ExamsBuilder.saveExamResult(userId, exam.$id, 0, exam.questions.length);
+            } catch (e) {
+                console.error("Failed to mark start:", e);
+            }
+
+            currentExam = exam;
+            userAnswers = new Array(exam.questions.length).fill(null);
+            currentQIndex = 0;
+
+            document.getElementById('playerExamTitle').textContent = exam.title;
+            document.getElementById('examPlayerModal').style.display = 'flex';
+
+            showQuestion(0);
+            startTimer(exam.timeLimit * 60);
+        };
+
+        function showQuestion(index) {
+            currentQIndex = index;
+            const q = currentExam.questions[index];
+            const container = document.getElementById('questionContainer');
+
+            container.innerHTML = `
+                <div style="font-size:1.2rem; font-weight:bold; margin-bottom:20px;">
+                    سؤال ${index + 1} من ${currentExam.questions.length}:<br>
+                    ${q.text}
+                </div>
+                <div style="display:grid; gap:10px;">
+                    ${q.choices.map((c, i) => `
+                        <label style="display:flex; align-items:center; gap:10px; padding:15px; background:#f0f4f8; border-radius:8px; cursor:pointer; border:2px solid ${userAnswers[index] === i ? '#0d47a1' : 'transparent'};">
+                            <input type="radio" name="choice" value="${i}" ${userAnswers[index] === i ? 'checked' : ''} onchange="selectAnswer(${i})">
+                            ${c}
+                        </label>
+                    `).join('')}
+                </div>
+            `;
+
+            document.getElementById('prevQBtn').style.display = index === 0 ? 'none' : 'block';
+            document.getElementById('nextQBtn').style.display = index === currentExam.questions.length - 1 ? 'none' : 'block';
+            document.getElementById('submitExamBtn').style.display = index === currentExam.questions.length - 1 ? 'block' : 'none';
+        }
+
+        window.selectAnswer = (i) => {
+            userAnswers[currentQIndex] = i;
+            showQuestion(currentQIndex); // Refresh UI for selection
+        };
+
+        window.changeQuestion = (dir) => {
+            showQuestion(currentQIndex + dir);
+        };
+
+        function startTimer(seconds) {
+            clearInterval(timerInterval);
+            let remaining = seconds;
+            const display = document.getElementById('examTimer');
+
+            timerInterval = setInterval(() => {
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                display.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                    alert("انتهى وقت الامتحان!");
+                    finishExam();
+                }
+                remaining--;
+            }, 1000);
+        }
+
+        window.finishExam = async () => {
+            clearInterval(timerInterval);
+            let score = 0;
+            currentExam.questions.forEach((q, i) => {
+                if (userAnswers[i] === q.correctAnswer) score++;
+            });
+
+            const percent = Math.round((score / currentExam.questions.length) * 100);
+            const userId = localStorage.getItem('user_id');
+
+            // Save final result
+            try {
+                await window.ExamsBuilder.saveExamResult(userId, currentExam.$id, score, currentExam.questions.length);
+            } catch (e) {
+                console.error("Failed to save final score:", e);
+            }
+
+            const container = document.getElementById('questionContainer');
+            container.innerHTML = `
+                <div style="text-align:center; padding:2rem;">
+                    <div style="font-size:3rem;">${percent >= 50 ? '🎉' : '😕'}</div>
+                    <h2>نتيجتك: ${score} من ${currentExam.questions.length}</h2>
+                    <p style="font-size:1.5rem; color:${percent >= 50 ? 'green' : 'red'}; font-weight:bold;">${percent}%</p>
+                    <button class="action-btn" style="margin-top:20px;" onclick="location.reload()">إغلاق وإنهاء</button>
+                </div>
+            `;
+
+            // Hide control buttons
+            document.getElementById('prevQBtn').style.display = 'none';
+            document.getElementById('nextQBtn').style.display = 'none';
+            document.getElementById('submitExamBtn').style.display = 'none';
         };
     </script>
 </body>

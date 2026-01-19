@@ -20,7 +20,9 @@ const DB_ID = 'MainDatabase';
 const COLLECTIONS = {
     MATERIALS: 'materials',
     USERS: 'users',
-    LOGS: 'security_logs'
+    LOGS: 'security_logs',
+    EXAMS: 'exams',
+    RESULTS: 'exam_results'
 };
 const BUCKET_ID = '696634ee001b4024cc9d'; // Updated from screenshot
 

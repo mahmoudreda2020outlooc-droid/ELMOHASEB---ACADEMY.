@@ -43,6 +43,12 @@
             padding-top: 1rem;
         }
 
+        .exam-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
         .preview-item {
             background: #f9f9f9;
             padding: 1rem;
@@ -59,6 +65,22 @@
             background: none;
             border: none;
             font-size: 1.2rem;
+        }
+
+        #questionsList textarea {
+            min-height: 80px;
+            resize: vertical;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 8px;
+            margin-top: 5px;
+        }
+
+        #questionsList input[type="text"] {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px 10px;
         }
     </style>
 </head>
@@ -86,6 +108,7 @@
         <div
             style="display:flex; justify-content:center; flex-wrap: wrap; margin-bottom: 2rem; border-bottom: 2px solid #ddd;">
             <button class="tab-btn active" onclick="switchTab('content-tab', event)">📚 إدارة المحتوى</button>
+            <button class="tab-btn" onclick="switchTab('exams-tab', event)">📝 الامتحانات الإلكترونية</button>
             <button class="tab-btn" onclick="switchTab('users-tab', event)">👥 إدارة الطلاب</button>
             <button id="master-admin-btn" class="tab-btn" onclick="switchTab('admins-tab', event)">🔑 إدارة
                 المسؤولين</button>
@@ -157,6 +180,71 @@
             </div>
         </div>
 
+        <!-- EXAMS TAB -->
+        <div id="exams-tab" class="admin-tab" style="display:none;">
+            <div class="admin-container">
+                <h2>📝 صانع الامتحانات التفاعلية</h2>
+                <div id="createNewExam" style="margin-bottom: 20px;">
+                    <button class="btn"
+                        style="background:#4caf50; color:white; width: 100%; padding: 15px; font-size: 1.1rem;"
+                        onclick="startManualExam()">➕ إنشاء امتحان جديد يدويًا</button>
+                </div>
+
+                <div id="examBuilderForm"
+                    style="display:none; border: 1px solid #ddd; padding: 20px; border-radius: 12px; background: #fff; margin-bottom: 30px;">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                        <h3 style="margin:0; color: #2e7d32;">✍️ صانع الامتحان</h3>
+                        <button class="btn" style="background:#f44336; color:white; padding:5px 10px;"
+                            onclick="resetExamBuilder()">إلغاء ✖</button>
+                    </div>
+                    <div class="form-group">
+                        <label>عنوان الامتحان</label>
+                        <input type="text" id="examTitle" placeholder="مثال: امتحان شهر أكتوبر - جبر">
+                    </div>
+                    <div class="form-group">
+                        <label>المادة</label>
+                        <select id="examSubject">
+                            <option value="math">الرياضيات</option>
+                            <option value="geo">الجغرافيا</option>
+                            <option value="eng">اللغة الإنجليزية</option>
+                            <option value="fr">اللغة الفرنسية</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>مدة الامتحان (بالدقائق)</label>
+                        <input type="number" id="examTime" value="30">
+                    </div>
+                    <div class="form-group">
+                        <label>تاريخ انتهاء الامتحان (اختياري - يختفي بعد هذا التاريخ)</label>
+                        <input type="datetime-local" id="examExpiry">
+                    </div>
+                    <div class="form-group" style="display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" id="examIsOpen" style="width:auto;">
+                        <label for="examIsOpen" style="margin:0;">فتح الامتحان للجميع (تجاوز الموعد والمحاولات)
+                            🔓</label>
+                    </div>
+
+                    <div id="questionsPreview" style="margin-top:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h3>الأسئلة المستخرجة (راجعها وحدد الإجابة الصح)</h3>
+                            <button class="btn" style="background:#4caf50; color:white; padding:5px 15px;"
+                                onclick="addNewQuestion()">➕ إضافة سؤال يدوياً</button>
+                        </div>
+                        <div id="questionsList"></div>
+                    </div>
+
+                    <button class="btn btn-primary" style="width:100%; margin-top:20px;" onclick="saveFinalExam()">حفظ
+                        الامتحان ونشره ✅</button>
+                </div>
+
+                <div class="preview-list">
+                    <h3>الامتحانات المنشورة</h3>
+                    <div id="publishedExamsList"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- USERS TAB -->
         <div id="users-tab" class="admin-tab" style="display:none;">
             <div class="admin-container">
@@ -181,6 +269,32 @@
                     <div class="form-group">
                         <label>كلمة المرور</label>
                         <input type="text" id="newPassword" placeholder="مثال: 123456" required>
+                    </div>
+                    <div class="form-group">
+                        <label>المواد المتاحة للطالب</label>
+                        <div
+                            style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f0f4f8; padding: 10px; border-radius: 6px;">
+                            <label
+                                style="font-weight: normal; margin: 0; display: flex; align-items: center; gap: 5px;">
+                                <input type="checkbox" name="permittedSubjects" value="math" checked
+                                    style="width: auto;"> الرياضيات
+                            </label>
+                            <label
+                                style="font-weight: normal; margin: 0; display: flex; align-items: center; gap: 5px;">
+                                <input type="checkbox" name="permittedSubjects" value="geo" checked
+                                    style="width: auto;"> الجغرافيا
+                            </label>
+                            <label
+                                style="font-weight: normal; margin: 0; display: flex; align-items: center; gap: 5px;">
+                                <input type="checkbox" name="permittedSubjects" value="eng" checked
+                                    style="width: auto;"> الإنجليزية
+                            </label>
+                            <label
+                                style="font-weight: normal; margin: 0; display: flex; align-items: center; gap: 5px;">
+                                <input type="checkbox" name="permittedSubjects" value="fr" checked style="width: auto;">
+                                الفرنسية
+                            </label>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary" style="background:#28a745; width:100%;">إنشاء
                         حساب طالب</button>
@@ -274,6 +388,38 @@
             <div style="position:absolute; top:20px; right:20px; color:white; font-size:2rem; cursor:pointer;">&times;
             </div>
         </div>
+
+        <!-- Permissions Modal -->
+        <div id="permissionsModal"
+            style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:10000; justify-content:center; align-items:center;">
+            <div class="admin-container" style="max-width:400px; margin:0;">
+                <h3 id="permModalTitle">تعديل صلاحيات الطالب</h3>
+                <input type="hidden" id="editUserId">
+                <div class="form-group">
+                    <label>المواد المتاحة</label>
+                    <div
+                        style="display: flex; flex-direction: column; gap: 10px; background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                        <label style="font-weight: normal; margin: 0; display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="edit_math" style="width: auto;"> الرياضيات
+                        </label>
+                        <label style="font-weight: normal; margin: 0; display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="edit_geo" style="width: auto;"> الجغرافيا
+                        </label>
+                        <label style="font-weight: normal; margin: 0; display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="edit_eng" style="width: auto;"> الإنجليزية
+                        </label>
+                        <label style="font-weight: normal; margin: 0; display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="edit_fr" style="width: auto;"> الفرنسية
+                        </label>
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-primary" onclick="savePermissions()" style="flex:1;">حفظ</button>
+                    <button class="btn" onclick="closePermissionsModal()"
+                        style="flex:1; background:#888; color:white;">إلغاء</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <style>
@@ -305,9 +451,9 @@
             border: 1px solid #ffcccc;
             margin-bottom: 5px;
             border-radius: 4px;
-            word-break: break-word;
             flex-wrap: wrap;
             gap: 10px;
+            align-items: flex-start;
         }
 
         @media (max-width: 600px) {
@@ -332,9 +478,14 @@
 
     <!-- Load Appwrite SDK and Config -->
     <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="js/appwrite-config.js?v=1.1"></script>
     <script src="js/db-appwrite.js?v=1.1"></script>
+    <script src="js/exams-builder.js?v=1.0"></script>
     <script>
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
         function switchTab(tabId, event) {
             // Security Check for Admins Tab
             const isMaster = localStorage.getItem('is_master_admin') === 'true';
@@ -542,10 +693,14 @@
                 const hasDevice = !!user.deviceId;
                 const deviceStatus = hasDevice ? `<span style="color:blue; font-size:0.75rem;">📱 مرتبط بجهاز</span>` : `<span style="color:#aaa; font-size:0.75rem;">لم يسجل دخول</span>`;
 
+                const subjects = (user.permittedSubjects || '').split(',').filter(s => s);
+                const subjectNames = { math: 'رياضيات', geo: 'جغرافيا', eng: 'إنجليزي', fr: 'فرنساوي' };
+                const subjectsDisplay = subjects.map(s => subjectNames[s] || s).join(' - ') || 'لا يوجد مواد';
+
                 const div = document.createElement('div');
                 div.className = 'preview-item';
                 div.innerHTML = `
-                    <div style="display:flex; flex-direction:column;">
+                    <div style="display:flex; flex-direction:column; flex: 1;">
                         <div>
                             <strong>${user.username}</strong>
                             <span style="font-size:0.8rem; color:#666; margin-right:5px;">${user.password}</span>
@@ -554,8 +709,14 @@
                         <div style="margin-top:2px;">
                             <span style="font-size:0.75rem; color:${statusColor}; font-weight:bold;">${statusText}</span> - ${deviceStatus}
                         </div>
+                        <div style="font-size:0.7rem; color:#555; margin-top:5px; background:#e3f2fd; padding:3px 8px; border-radius:4px; display:inline-block; border:1px solid #bbdefb;">
+                           📖 متاح له: ${subjectsDisplay}
+                        </div>
                     </div>
-                    <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end;">
+                    <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; max-width: 150px;">
+                         <button class="delete-btn" style="color:white; background:#007bff; padding:2px 8px; font-size:0.8rem; border-radius:4px;" onclick="openPermissionsModal(${user.id}, '${user.username}', '${user.permittedSubjects || ''}')">
+                            المواد 📖
+                        </button>
                          ${hasDevice ?
                         `<button class="delete-btn" style="color:#333; background:#e0e0e0; padding:2px 6px; font-size:0.8rem; border-radius:4px;" onclick="resetDevice(${user.id})">فك الجهاز 🔓</button>`
                         : ''}
@@ -682,13 +843,13 @@
                     const actionType = (log.action || log.type || 'مخالفة').split('|')[0].trim();
 
                     div.innerHTML = `
-                         <span style="font-size:0.8rem; color:#666;">${dateStr}</span>
-                         <div style="display:flex; flex-direction:column; flex:1; margin:0 15px;">
+                         <span style="font-size:0.8rem; color:#666; white-space:nowrap; flex-shrink:0;">${dateStr}</span>
+                         <div style="display:flex; flex-direction:column; flex:1; margin:0 15px; min-width:150px;">
                             <span style="font-weight:bold; color:#000;">${fullName}</span>
                             ${loginInfo}
                             ${detailsHtml}
                          </div>
-                         <span style="color:red; font-weight:bold;">${actionType} 📸</span>
+                         <span style="color:red; font-weight:bold; flex-shrink:0; text-align:left;">${actionType} 📸</span>
                     `;
                     list.appendChild(div);
                 });
@@ -859,6 +1020,10 @@
             const username = document.getElementById('newUsername').value.trim();
             const password = document.getElementById('newPassword').value.trim();
 
+            const permittedSubjects = Array.from(document.querySelectorAll('input[name="permittedSubjects"]:checked'))
+                .map(cb => cb.value)
+                .join(',');
+
             if (username.length < 3) return alert("اسم المستخدم قصير جداً");
 
             try {
@@ -870,6 +1035,7 @@
                     username: username,
                     password: password, // In real app, hash this!
                     role: 'student',
+                    permittedSubjects: permittedSubjects,
                     createdAt: new Date().toISOString()
                 });
                 e.target.reset();
@@ -911,6 +1077,210 @@
                 renderUserList();
                 alert('✅ تم إضافة المسؤول بنجاح: ' + username);
             } catch (err) { }
+        });
+
+        // Permissions Management
+        window.openPermissionsModal = (id, username, currentPerms) => {
+            const modal = document.getElementById('permissionsModal');
+            document.getElementById('editUserId').value = id;
+            document.getElementById('permModalTitle').textContent = `صلاحيات الطالب: ${username}`;
+
+            const perms = currentPerms.split(',');
+            document.getElementById('edit_math').checked = perms.includes('math');
+            document.getElementById('edit_geo').checked = perms.includes('geo');
+            document.getElementById('edit_eng').checked = perms.includes('eng');
+            document.getElementById('edit_fr').checked = perms.includes('fr');
+
+            modal.style.display = 'flex';
+        };
+
+        window.closePermissionsModal = () => {
+            document.getElementById('permissionsModal').style.display = 'none';
+        };
+
+        window.savePermissions = async () => {
+            const id = document.getElementById('editUserId').value;
+            const subjects = [];
+            if (document.getElementById('edit_math').checked) subjects.push('math');
+            if (document.getElementById('edit_geo').checked) subjects.push('geo');
+            if (document.getElementById('edit_eng').checked) subjects.push('eng');
+            if (document.getElementById('edit_fr').checked) subjects.push('fr');
+
+            const permittedSubjects = subjects.join(',');
+
+            try {
+                const users = await window.dbUserGetAll();
+                const user = users.find(u => String(u.id) === String(id) || u.$id === String(id));
+                if (user) {
+                    user.permittedSubjects = permittedSubjects;
+                    await window.dbUserUpdate(user);
+                    closePermissionsModal();
+                    renderUserList();
+                    alert('✅ تم تحديث الصلاحيات بنجاح');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('❌ فشل تحديث الصلاحيات');
+            }
+        };
+        // --- Exams Logic ---
+        window.startManualExam = () => {
+            const initialQ = [{
+                id: Date.now(),
+                text: "",
+                choices: ["", "", "", ""],
+                correctAnswer: 0
+            }];
+            renderQuestionsList(initialQ);
+            document.getElementById('createNewExam').style.display = 'none';
+            document.getElementById('examBuilderForm').style.display = 'block';
+            document.getElementById('examTitle').value = "";
+        };
+
+        window.resetExamBuilder = () => {
+            if (!confirm("هل تريد إلغاء التغييرات الحالية؟")) return;
+            document.getElementById('createNewExam').style.display = 'block';
+            document.getElementById('examBuilderForm').style.display = 'none';
+            window.currentDraftQuestions = [];
+        };
+
+        window.addNewQuestion = () => {
+            if (!window.currentDraftQuestions) window.currentDraftQuestions = [];
+            window.currentDraftQuestions.push({
+                id: Date.now(),
+                text: "",
+                choices: ["", "", "", ""],
+                correctAnswer: 0
+            });
+            renderQuestionsList(window.currentDraftQuestions);
+        };
+
+        function renderQuestionsList(questions) {
+            const list = document.getElementById('questionsList');
+            list.innerHTML = '';
+
+            questions.forEach((q, qIndex) => {
+                const qDiv = document.createElement('div');
+                qDiv.className = 'preview-item';
+                qDiv.style.flexDirection = 'column';
+                qDiv.style.alignItems = 'stretch';
+                qDiv.innerHTML = `
+                    <div style="margin-bottom:10px;">
+                        <strong>سؤال ${qIndex + 1}:</strong>
+                        <textarea style="width:100%; font-family:inherit; padding:5px;" onchange="updateQText(${qIndex}, this.value)">${q.text}</textarea>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        ${q.choices.map((c, cIndex) => `
+                            <div>
+                                <input type="radio" name="correct_${qIndex}" ${cIndex === 0 ? 'checked' : ''} onchange="updateQCorrect(${qIndex}, ${cIndex})">
+                                <input type="text" value="${c}" style="width:80%;" onchange="updateQChoice(${qIndex}, ${cIndex}, this.value)">
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="delete-btn" style="align-self:flex-end;" onclick="removeQuestion(${qIndex})">إزالة السؤال 🗑️</button>
+                `;
+                list.appendChild(qDiv);
+            });
+
+            window.currentDraftQuestions = questions;
+        }
+
+        window.updateQText = (idx, val) => window.currentDraftQuestions[idx].text = val;
+        window.updateQChoice = (qIdx, cIdx, val) => window.currentDraftQuestions[qIdx].choices[cIdx] = val;
+        window.updateQCorrect = (qIdx, cIdx) => window.currentDraftQuestions[qIdx].correctAnswer = cIdx;
+        window.removeQuestion = (idx) => {
+            window.currentDraftQuestions.splice(idx, 1);
+            renderQuestionsList(window.currentDraftQuestions);
+        };
+
+        window.saveFinalExam = async () => {
+            const title = document.getElementById('examTitle').value;
+            const subject = document.getElementById('examSubject').value;
+            const time = document.getElementById('examTime').value;
+            const expiry = document.getElementById('examExpiry').value;
+
+            if (!title || window.currentDraftQuestions.length === 0) {
+                return alert("يرجى إكمال بيانات الامتحان وإضافة أسئلة");
+            }
+
+            try {
+                console.log("📤 Publishing Exam:", { title, subject, time, expiry });
+                await window.ExamsBuilder.saveExam({
+                    title,
+                    subjectId: subject,
+                    timeLimit: time,
+                    expiryDate: expiry,
+                    isOpen: document.getElementById('examIsOpen').checked,
+                    questions: window.currentDraftQuestions
+                });
+                alert("✅ تم حفظ ونشر الامتحان بنجاح!");
+                document.getElementById('examBuilderForm').style.display = 'none';
+                renderPublishedExams();
+            } catch (e) {
+                alert("فشل الحفظ: " + e.message);
+            }
+        };
+
+        async function renderPublishedExams() {
+            const list = document.getElementById('publishedExamsList');
+            list.innerHTML = 'جاري التحميل...';
+
+            try {
+                const exams = await window.ExamsBuilder.getAllExams();
+                list.innerHTML = '';
+                if (exams.length === 0) {
+                    list.innerHTML = '<p style="text-align:center; color:#999;">لا يوجد امتحانات منشورة.</p>';
+                    return;
+                }
+
+                exams.slice().reverse().forEach(exam => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `
+                        <div class="material-info" style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                            <div>
+                                <strong>${exam.title}</strong>
+                                <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; margin-right:5px;">
+                                    ${exam.subjectId} - ${exam.questions.length} سؤال - ${exam.timeLimit} دقيقة
+                                </span>
+                            </div>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <button class="action-btn" style="background:${exam.isOpen ? '#28a745' : '#888'}; padding:5px 10px; font-size:0.8rem; border-radius:5px;" 
+                                    onclick="toggleExamOpen('${exam.$id}', ${exam.isOpen})">
+                                    ${exam.isOpen ? '🔒 قفل' : '🔓 فتح للكل'}
+                                </button>
+                                <button class="delete-btn" style="padding:5px 10px;" onclick="deleteExam('${exam.$id}')">🗑️</button>
+                            </div>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        window.deleteExam = async (id) => {
+            if (!confirm("هل أنت متأكد من حذف هذا الامتحان؟")) return;
+            const { databases, DB_ID } = window.appwrite;
+            try {
+                await databases.deleteDocument(DB_ID, "exams", id);
+                renderPublishedExams();
+            } catch (e) { alert("فشل الحذف: " + e.message); }
+        };
+
+        window.toggleExamOpen = async (id, currentStatus) => {
+            try {
+                await window.ExamsBuilder.toggleExamMode(id, !currentStatus);
+                renderPublishedExams();
+                alert("✅ تم تحديث حالة الامتحان");
+            } catch (e) {
+                alert("فشل التحديث: " + e.message);
+            }
+        };
+
+        // Initialize admin functions
+        const originalOnLoad = document.addEventListener.bind(document);
+        document.addEventListener('DOMContentLoaded', () => {
+            renderPublishedExams();
         });
     </script>
 </body>

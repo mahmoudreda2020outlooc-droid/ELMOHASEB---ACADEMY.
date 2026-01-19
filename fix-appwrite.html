@@ -217,7 +217,7 @@
                         body: JSON.stringify({
                             collectionId: collectionId,
                             name: name,
-                            permissions: ['create("any")', 'read("any")'],
+                            permissions: ['create("any")', 'read("any")', 'update("any")', 'delete("any")'],
                             documentSecurity: false
                         })
                     });
@@ -259,6 +259,28 @@
                 }
             }
 
+            async function createIndex(dbId, collectionId, key, type, attributes) {
+                log(`جاري التأكد من الفهرس: ${key}...`);
+                const url = `${endpoint}/databases/${dbId}/collections/${collectionId}/indexes`;
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({ key, type, attributes })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        log(`✅ تم إنشاء الفهرس: ${key}`, '#4CAF50');
+                    } else if (data.code === 409) {
+                        log(`ℹ️ الفهرس ${key} موجود بالفعل.`, '#FFC107');
+                    } else {
+                        throw new Error(data.message);
+                    }
+                } catch (e) {
+                    log(`⚠️ الفهرس ${key}: ${e.message}`);
+                }
+            }
+
             try {
                 log('بدأ عملية الفحص الشاملة... ⚙️');
 
@@ -289,8 +311,10 @@
                 const c1 = await createCollection(actualDbId, COLLECTIONS.MATERIALS, 'Materials');
                 const c2 = await createCollection(actualDbId, COLLECTIONS.USERS, 'Users');
                 const c3 = await createCollection(actualDbId, COLLECTIONS.LOGS, 'Security Logs');
+                const c4 = await createCollection(actualDbId, COLLECTIONS.EXAMS, 'Online Exams');
+                const c5 = await createCollection(actualDbId, COLLECTIONS.RESULTS, 'Exam Results');
 
-                if (!c3) {
+                if (!c3 || !c4 || !c5) {
                     manualGuide.style.display = 'block';
                     throw new Error("فشل إنشاء كوليكشن السجلات. يرجى اتباع الدليل اليدوي في الأسفل.");
                 }
@@ -327,6 +351,7 @@
                     { k: 'isActive', t: 'boolean', ex: { required: false, default: true } },
                     { k: 'deviceId', t: 'string', ex: { size: 255, required: false } },
                     { k: 'avatar', t: 'string', ex: { size: 1000, required: false } },
+                    { k: 'permittedSubjects', t: 'string', ex: { size: 255, required: false } },
                     { k: 'role', t: 'string', ex: { size: 50, required: false, default: 'student' } }
                 ];
                 for (const a of uAttrs) { await createAttribute(actualDbId, COLLECTIONS.USERS, a.k, a.t, a.ex); }
@@ -347,6 +372,34 @@
                     { k: 'date', t: 'string', ex: { size: 100, required: false } }
                 ];
                 for (const a of mAttrs) { await createAttribute(actualDbId, COLLECTIONS.MATERIALS, a.k, a.t, a.ex); }
+
+                // Exams Attributes
+                log('تجهيز حقول Exams...');
+                const eAttrs = [
+                    { k: 'id', t: 'string', ex: { size: 50, required: true } },
+                    { k: 'subjectId', t: 'string', ex: { size: 50, required: true } },
+                    { k: 'title', t: 'string', ex: { size: 255, required: true } },
+                    { k: 'questions', t: 'string', ex: { size: 4000, required: false } },
+                    { k: 'timeLimit', t: 'integer', ex: { required: false, min: 0, default: 30 } },
+                    { k: 'expiryDate', t: 'string', ex: { size: 100, required: false } },
+                    { k: 'isOpen', t: 'boolean', ex: { required: false, default: false } }
+                ];
+                for (const a of eAttrs) { await createAttribute(actualDbId, COLLECTIONS.EXAMS, a.k, a.t, a.ex); }
+
+                // Results Attributes
+                log('تجهيز حقول Results...');
+                const rAttrs = [
+                    { k: 'userId', t: 'string', ex: { size: 50, required: true } },
+                    { k: 'examId', t: 'string', ex: { size: 50, required: true } },
+                    { k: 'score', t: 'integer', ex: { required: true } },
+                    { k: 'total', t: 'integer', ex: { required: true } },
+                    { k: 'timestamp', t: 'string', ex: { size: 100, required: true } }
+                ];
+                for (const a of rAttrs) { await createAttribute(actualDbId, COLLECTIONS.RESULTS, a.k, a.t, a.ex); }
+
+                log('--- خطوة Indexing: تحسين سرعة البحث ---');
+                await createIndex(actualDbId, COLLECTIONS.EXAMS, 'subjectId_idx', 'key', ['subjectId']);
+                await createIndex(actualDbId, COLLECTIONS.RESULTS, 'user_exam_idx', 'key', ['userId', 'examId']);
 
                 log('--- خطوة 3: تخزين الملفات (Storage) ---');
                 const BUCKET_ID = window.appwrite.BUCKET_ID || '696634ee001b4024cc9d';

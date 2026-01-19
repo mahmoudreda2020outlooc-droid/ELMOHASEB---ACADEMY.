@@ -13,6 +13,23 @@
         .dashboard-grid {
             margin-top: 2rem;
         }
+
+        .subject-card.locked {
+            opacity: 0.6;
+            filter: grayscale(1);
+            cursor: not-allowed;
+            position: relative;
+            pointer-events: none;
+            /* Disable clicks */
+        }
+
+        .subject-card.locked::after {
+            content: '🔒';
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 1.5rem;
+        }
     </style>
     <!-- Load Appwrite SDK and Config -->
     <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
@@ -57,6 +74,75 @@
             if (!sessionStorage.getItem('security_warned')) {
                 document.getElementById('security-warning-modal').style.display = 'flex';
             }
+
+            // --- Subject Permissions Logic (Real-time Sync) ---
+            async function syncPermissions() {
+                console.log("🔄 Syncing permissions...");
+                const userId = localStorage.getItem('user_id');
+
+                if (userId && window.dbUserGet) {
+                    try {
+                        const currentUser = await window.dbUserGet(userId);
+                        if (currentUser) {
+                            console.log("✅ Current user data fetched:", currentUser);
+                            localStorage.setItem('user_permitted_subjects', currentUser.permittedSubjects || "");
+                        } else {
+                            console.warn("⚠️ Could not fetch user data for ID:", userId);
+                        }
+                    } catch (e) { console.error("Sync error:", e); }
+                }
+
+                // Default to ALL if nothing is set in localStorage yet (for first-time migration)
+                let permittedStr = localStorage.getItem('user_permitted_subjects');
+                if (permittedStr === null) {
+                    permittedStr = "math,geo,eng,fr"; // Initial fallback
+                }
+
+                const permitted = permittedStr.split(',').filter(s => s.trim());
+                console.log("🔍 Permitted subjects:", permitted);
+
+                const subjectCards = document.querySelectorAll('.subject-card');
+                let visibleCount = 0;
+
+                subjectCards.forEach(card => {
+                    const href = card.getAttribute('data-href') || card.getAttribute('href') || "";
+                    if (!card.hasAttribute('data-href')) card.setAttribute('data-href', href); // Save original href
+
+                    const url = new URL(href, window.location.origin);
+                    const subjectId = url.searchParams.get('id');
+
+                    if (subjectId) {
+                        if (permitted.length > 0 && !permitted.includes(subjectId)) {
+                            card.classList.add('locked');
+                            card.removeAttribute('href'); // Remove link
+                            card.style.display = 'flex'; // Ensure it's visible
+                        } else {
+                            card.classList.remove('locked');
+                            card.setAttribute('href', card.getAttribute('data-href')); // Restore link
+                            card.style.display = 'flex';
+                            visibleCount++;
+                        }
+                    }
+                });
+
+                if (visibleCount === 0 && permittedStr !== "") {
+                    console.warn("🚫 No matching subjects found for permissions:", permitted);
+                }
+
+                if (visibleCount === 0) {
+                    const grid = document.querySelector('.dashboard-grid');
+                    grid.innerHTML = `
+                        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: #fff; border-radius: 16px; border: 2px dashed #ddd;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">🔒</div>
+                            <h3 style="color: #333; margin-bottom: 0.5rem;">لا يوجد مواد مفعلة حالياً</h3>
+                            <p style="color: #666;">يرجى التواصل مع الإدارة لتفعيل المواد الخاصة بك.</p>
+                            <a href="tel:01027783480" style="display: inline-block; margin-top: 1rem; color: #0d47a1; font-weight: bold; text-decoration: none; border: 1px solid #0d47a1; padding: 8px 20px; border-radius: 8px;">اتصل بالدعم الفني 📞</a>
+                        </div>
+                    `;
+                }
+            }
+
+            syncPermissions();
         });
     </script>
 </head>
