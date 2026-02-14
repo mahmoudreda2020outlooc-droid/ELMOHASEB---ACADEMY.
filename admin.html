@@ -654,7 +654,7 @@
                     <div style="display:flex; flex-direction:column;">
                         <div>
                             <strong>${user.username}</strong>
-                            <span style="font-size:0.8rem; color:#666; margin-right:5px;">${user.password}</span>
+                            <span style="font-size:0.8rem; color:#666; margin-right:5px;">🔒</span>
                             <span style="font-size:0.75rem; background:#ffebee; color:#c62828; padding:2px 6px; border-radius:10px; font-weight:bold;">Admin</span>
                         </div>
                         <div style="font-size:0.85rem; color:#444;">${user.firstName || user.username}</div>
@@ -703,7 +703,7 @@
                     <div style="display:flex; flex-direction:column; flex: 1;">
                         <div>
                             <strong>${user.username}</strong>
-                            <span style="font-size:0.8rem; color:#666; margin-right:5px;">${user.password}</span>
+                            <span style="font-size:0.8rem; color:#666; margin-right:5px;">🔒</span>
                             <div style="font-size:0.85rem; color:#444;">${user.firstName || ''} ${user.lastName || ''}</div>
                         </div>
                         <div style="margin-top:2px;">
@@ -806,11 +806,7 @@
 
                     // Extract password from action field if present (using fallback from users collection)
                     let displayPass = 'N/A';
-                    if (log.action && log.action.includes('Password:')) {
-                        displayPass = log.action.split('Password:')[1].trim();
-                    } else if (userDetails) {
-                        displayPass = userDetails.password;
-                    }
+                    displayPass = "🔒";
 
                     const loginInfo = `
                         <div style="background:#fff3e0; border:1px solid #ffe0b2; padding:8px; border-radius:8px; margin-top:8px; font-size:0.9rem; line-height:1.4;">

@@ -121,6 +121,8 @@ window.dbUserLogin = async (username, password) => {
     const { databases, DB_ID, COLLECTIONS, Query } = getAppwrite();
     try {
         if (!databases) throw new Error("Appwrite not initialized");
+
+        // Find user by username
         const response = await databases.listDocuments(DB_ID, COLLECTIONS.USERS, [
             Query.equal("username", username)
         ]);
@@ -128,11 +130,13 @@ window.dbUserLogin = async (username, password) => {
         if (response.total === 0) return null;
 
         const user = response.documents[0];
+
+        // SECURITY UPDATE: We still have plain text passwords in the DB (for now).
+        // But we are moving away from showing them in the UI.
         if (user.password === password) {
-            // Map Appwrite attributes to match expectations if needed
             return {
                 ...user,
-                id: user.id || parseInt(user.$id) || user.$id, // Fallback for ID handling
+                id: user.id || user.$id,
                 role: user.role || 'student'
             };
         }

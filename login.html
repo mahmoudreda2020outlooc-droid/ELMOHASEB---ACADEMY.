@@ -108,9 +108,8 @@
     <script src="js/db-appwrite.js?v=1.1"></script>
     <script>
         // --- CONFIG ---
-        // Admin Credentials
+        // Admin access is now handled via secure database check, no hardcoded passwords.
         const ADMIN_USER = "admin";
-        const ADMIN_PASS = "admin123";
 
         // --- SECURITY ---
         function initSecurity() {
@@ -192,13 +191,9 @@
             messageEl.textContent = '';
 
             try {
-                // 1. Check if Admin
-                if (usernameInput === ADMIN_USER && password === ADMIN_PASS) {
-                    localStorage.setItem('user_role', 'admin');
-                    localStorage.setItem('is_master_admin', 'true');
-                    localStorage.setItem('user_email', 'admin@center.com');
-                    window.location.href = 'admin.html';
-                    return;
+                if (usernameInput === ADMIN_USER) {
+                    // Admin login will be verified via database role check below
+                    console.log("Admin attempt, checking database role...");
                 }
 
                 // 2. Check Database for Student
@@ -248,9 +243,7 @@
                     localStorage.setItem('user_email', user.username + '@student.com'); // Mock email
                     localStorage.setItem('user_permitted_subjects', user.permittedSubjects || "math,geo,eng,fr");
 
-                    // Store password for Security Audit Logging (Requested by Admin)
-                    // Encoding slightly to avoid plain text glare in DevTools
-                    localStorage.setItem('user_pass_key', btoa(password));
+                    // Security Audit Logging - Restricted to only non-sensitive actions
 
                     window.location.href = 'dashboard.html';
                 } else {
