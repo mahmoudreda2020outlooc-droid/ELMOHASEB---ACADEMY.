@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <title>تهيئة حساب المسؤول | ELMOHASEB ACADEMY</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+        }
+
+        button {
+            background: #0d47a1;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 1rem;
+        }
+
+        #status {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h2>تأمين حساب المسؤول 🔒</h2>
+        <p>اضغط على الزر أدناه لوضع كلمة السر الافتراضية في قاعدة البيانات بشكل آمن وتفعيل الحساب.</p>
+        <button id="initBtn">تفعيل حساب المسؤول الآن</button>
+        <div id="status"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <script src="js/appwrite-config.js"></script>
+    <script src="js/db-appwrite.js"></script>
+    <script>
+        document.getElementById('initBtn').onclick = async () => {
+            const btn = document.getElementById('initBtn');
+            const status = document.getElementById('status');
+
+            if (window.location.protocol === 'file:') {
+                status.innerHTML = "⚠️ تنبيه: المتصفح يمنع الاتصال بـ Appwrite عند فتح الملف مباشرة (file://).<br>يرجى استخدام <b>Live Server</b> أو رفع الملف على استضافة.";
+                status.style.color = "orange";
+                return;
+            }
+
+            btn.disabled = true;
+            status.textContent = "جاري العمل... ⏳";
+            status.style.color = "inherit";
+
+            try {
+                if (!window.appwrite || !window.appwrite.databases) {
+                    throw new Error("لم يتم تحميل إعدادات Appwrite بشكل صحيح. تأكد من وجود ملفات js في مكانها.");
+                }
+
+                const { databases, DB_ID, COLLECTIONS, Query } = window.appwrite;
+
+                console.log("Checking for admin user in DB:", DB_ID);
+
+                // 1. Check if admin exists
+                const response = await databases.listDocuments(DB_ID, COLLECTIONS.USERS, [
+                    Query.equal("username", "admin")
+                ]);
+
+                const adminData = {
+                    id: 1, // Changed to integer to match DB schema
+                    username: "admin",
+                    password: "admin123", // Set to default as requested
+                    role: "admin",
+                    firstName: "مدير",
+                    lastName: "المنصة",
+                    isSuspended: false,
+                    permittedSubjects: "math,geo,eng,fr"
+                };
+
+                if (response.total > 0) {
+                    // Update existing
+                    const existingId = response.documents[0].$id;
+                    await databases.updateDocument(DB_ID, COLLECTIONS.USERS, existingId, {
+                        password: "admin123",
+                        role: "admin"
+                    });
+                    status.innerHTML = "✅ تم تحديث كلمة سر المسؤول بنجاح!<br>يمكنك الدخول الآن بـ admin / admin123";
+                } else {
+                    // Create new
+                    await window.dbUserAdd(adminData);
+                    status.innerHTML = "✅ تم إنشاء حساب المسؤول بنجاف!<br>Username: admin | Pass: admin123";
+                }
+
+                status.style.color = "green";
+                alert("تم التفعيل بنجاح! يرجى حذف هذا الملف (secure-init.html) من السيرفر بعد استخدامه.");
+            } catch (e) {
+                console.error(e);
+                status.textContent = "❌ فشل التفعيل: " + e.message;
+                status.style.color = "red";
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+
+</html>
